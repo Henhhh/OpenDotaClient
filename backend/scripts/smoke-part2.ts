@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import { createPart2App } from '../src/part2-dev.ts';
 import { contractClient } from '../src/integrations/opendota/index.ts';
-import { createTeamCatalogSearch } from '../src/modules/search/team-catalog.ts';
+import { createTeamCatalogSearch } from '../src/modules/pro/team-search.ts';
 const client = contractClient();
 const server = createPart2App({ client, teams: createTeamCatalogSearch(client), enableRankings: true }).listen(0, '127.0.0.1');
 await new Promise<void>(resolve => server.once('listening', resolve));

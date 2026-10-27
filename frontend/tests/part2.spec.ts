@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 test("API hero detail, matchups, build items and disabled rankings", async ({
   page,
 }) => {
-  await page.goto("/hero?id=1");
+  await page.goto("/heroes/detail?id=1");
   await expect(page.getByText("Blink", { exact: true })).toBeVisible();
   await expect(page.getByText("Talent data unavailable.")).toBeVisible();
   await page.getByRole("button", { name: "Statistics", exact: true }).click();
@@ -41,7 +41,7 @@ test("API failure can retry; empty heroes has no sample fallback", async ({
       },
     });
   });
-  await page.goto("/heroes");
+  await page.goto("/main/heroes");
   await expect(page.getByText("OpenDota request failed")).toBeVisible();
   failed = false;
   await page.getByRole("button", { name: "Retry", exact: true }).click();
@@ -62,7 +62,7 @@ test("Search calls selected backend category and opens API hero ID", async ({
     .fill("Storm");
   await request;
   await page.getByText("Storm Spirit", { exact: true }).click();
-  await expect(page).toHaveURL(/hero\?.*id=17/);
+  await expect(page).toHaveURL(/\/heroes\/detail\?.*id=17/);
   await expect(page.getByText("Blink", { exact: true })).toBeVisible();
 });
 test("hero pagination appends rows and changing filters resets the page", async ({
@@ -100,7 +100,7 @@ test("hero pagination appends rows and changing filters resets the page", async 
       },
     });
   });
-  await page.goto("/heroes");
+  await page.goto("/main/heroes");
   await page
     .getByRole("button", { name: "Load more heroes", exact: true })
     .click();
@@ -125,7 +125,7 @@ test("network disconnect shows a recoverable error without sample data", async (
     if (disconnected) await route.abort("internetdisconnected");
     else await route.fallback();
   });
-  await page.goto("/heroes");
+  await page.goto("/main/heroes");
   await expect(
     page.getByText(
       "Cannot reach the API. Check the connection and backend address.",
@@ -182,7 +182,7 @@ test("rankings pages append correctly and missing avatars do not break rendering
       },
     });
   });
-  await page.goto("/hero?id=1");
+  await page.goto("/heroes/detail?id=1");
   await page.getByRole("button", { name: "Players", exact: true }).click();
   await expect(page.getByText("1. First pro", { exact: true })).toBeVisible();
   await page
@@ -207,7 +207,7 @@ test("match builds show no fabricated inventory and handle missing abilities", a
       },
     });
   });
-  await page.goto("/build?heroId=1&matchId=123&slot=0");
+  await page.goto("/heroes/build?heroId=1&matchId=123&slot=0");
   await expect(page.getByText(/Match 123 · slot 0/)).toBeVisible();
   await expect(page.getByText("Final inventory", { exact: true })).toHaveCount(
     0,
@@ -226,10 +226,10 @@ for (const width of [320, 768]) {
   test("part 2 layout stays within viewport " + width, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     for (const path of [
-      "/heroes",
-      "/hero?id=1",
-      "/heroRanks",
-      "/build?heroId=1",
+      "/main/heroes",
+      "/heroes/detail?id=1",
+      "/heroes/ranks",
+      "/heroes/build?heroId=1",
       "/search",
     ]) {
       await page.goto(path);

@@ -9,7 +9,7 @@ test("Home and Profile use backend data, switch accounts, refresh, heroes, peers
     errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   try {
-    await page.goto("/");
+    await page.goto("/main");
     await selectAccount(page);
     const before = f.calls.filter((c) => c.path === "/players/1").length;
     await expect(
@@ -41,7 +41,7 @@ test("Home and Profile use backend data, switch accounts, refresh, heroes, peers
     await expect(page.getByText("API Teammate", { exact: true })).toBeVisible();
     await page.getByText("API Teammate", { exact: true }).click();
     await expect(page.getByText("API Player 2", { exact: true })).toBeVisible();
-    await page.goto("/profile");
+    await page.goto("/main/profile");
     await page.getByRole("button", { name: "Statistics", exact: true }).click();
     await page.getByRole("button", { name: "Recent", exact: true }).click();
     await expect(page.getByText("20 matches · 20 samples")).toBeVisible();
@@ -51,7 +51,7 @@ test("Home and Profile use backend data, switch accounts, refresh, heroes, peers
       page.getByRole("textbox", { name: "Player account ID" }),
     ).toHaveValue("1");
     await page.setViewportSize({ width: 360, height: 780 });
-    await page.goto("/");
+    await page.goto("/main");
     await expect(
       page.getByText("API Player 1", { exact: true }).filter({ visible: true }),
     ).toBeVisible();
@@ -72,7 +72,7 @@ test("Match history paginates and sends filters; match IDs retain all digits", a
 }) => {
   const f = await setupPart1(page);
   try {
-    await page.goto("/matches");
+    await page.goto("/main/matches");
     await page.getByRole("textbox", { name: "Player account ID" }).fill("1");
     await page
       .getByRole("button", { name: "View player", exact: true })
@@ -119,18 +119,18 @@ test("Players show private, missing, empty and upstream errors without sample fa
   const f = await setupPart1(page);
   try {
     f.state.private = true;
-    await page.goto("/player?id=1");
+    await page.goto("/players/detail?id=1");
     await expect(
       page.getByText("This player has private match history."),
     ).toBeVisible();
     await expect(page.locator("body")).not.toContainText("Kaito");
-    await page.goto("/player?id=404");
+    await page.goto("/players/detail?id=404");
     await expect(
       page.getByText("No data found for this ID.").first(),
     ).toBeVisible();
     f.state.private = false;
     f.state.empty = true;
-    await page.goto("/matches");
+    await page.goto("/main/matches");
     await expect(
       page.getByText("No matches match these filters."),
     ).toBeVisible();
@@ -150,7 +150,7 @@ test("Compare validates IDs, preserves order and switches stats scope", async ({
 }) => {
   const f = await setupPart1(page);
   try {
-    await page.goto("/compare");
+    await page.goto("/players/compare");
     await page.getByRole("textbox", { name: "First account ID" }).fill("1");
     await page.getByRole("textbox", { name: "Second account ID" }).fill("1");
     await page
@@ -183,7 +183,7 @@ test("Session parse submits once, verifies completion and refreshes parsed inven
 }) => {
   const f = await setupPart1(page, { signedIn: true });
   try {
-    await page.goto("/match?id=9007199254740993");
+    await page.goto("/matches/detail?id=9007199254740993");
     await page.getByRole("button", { name: "Analysis", exact: true }).click();
     await page
       .getByRole("button", { name: "Request parse", exact: true })
@@ -214,7 +214,7 @@ test("Parse unavailable stays explicit and unknown polling stops after two minut
   try {
     f.state.missingJob = true;
     await page.clock.install();
-    await page.goto("/match?id=9007199254740993");
+    await page.goto("/matches/detail?id=9007199254740993");
     await page.getByRole("button", { name: "Analysis", exact: true }).click();
     await page
       .getByRole("button", { name: "Request parse", exact: true })
@@ -238,7 +238,7 @@ test("Parse unavailable stays explicit and unknown polling stops after two minut
 test("Disabled parse reports 501 for a signed-in user", async ({ page }) => {
   const f = await setupPart1(page, { signedIn: true, parse: false });
   try {
-    await page.goto("/match?id=9007199254740993");
+    await page.goto("/matches/detail?id=9007199254740993");
     await page.getByRole("button", { name: "Analysis", exact: true }).click();
     await page
       .getByRole("button", { name: "Request parse", exact: true })

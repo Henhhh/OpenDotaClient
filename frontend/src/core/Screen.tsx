@@ -31,6 +31,7 @@ import { IconButton } from "@/shared/ui/IconButton";
 import { Txt } from "@/shared/ui/Txt";
 import { C, s } from "@/shared/theme/theme";
 import { go } from "@/shared/navigation/navigation";
+import { ROUTES } from "@/shared/navigation/routes";
 import { useUnread } from "@/features/account/api";
 
 const TITLES: Record<string, string> = {
@@ -212,7 +213,9 @@ export function Screen({ name }: { name: string }) {
           <IconButton
             name="back"
             onPress={() =>
-              router.canGoBack() ? router.back() : router.replace("/")
+              router.canGoBack()
+                ? router.back()
+                : router.replace(ROUTES.home as never)
             }
             label="Go back"
           />
