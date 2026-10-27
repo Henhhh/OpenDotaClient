@@ -4,7 +4,7 @@ import type {
   Team,
   TeamSearchService,
 } from "../../../../shared/api-contract.ts";
-import { compareId } from "../part2/http.ts";
+import { compareId } from "../../core/http.ts";
 import { UpstreamError } from "../../integrations/opendota/errors.ts";
 function image(value: string | null | undefined): string | null {
   if (!value) return null;

@@ -7,7 +7,7 @@ import type {
   Settings,
   SettingsPatch,
 } from "../../../../shared/api-contract.ts";
-import { compareId, ApiError } from "../part2/http.ts";
+import { compareId, ApiError } from "../../core/http.ts";
 import { transaction } from "../../database/index.ts";
 type Row = Record<string, SQLOutputValue>;
 const notification = (r: Row): Notification => ({

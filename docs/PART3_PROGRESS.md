@@ -1,27 +1,41 @@
 # Tiến độ Người 3 — Pro Scene & tài khoản
 
-Cập nhật 27/10/2026; đã triển khai nền, backend và nối frontend Người 3; còn kiểm chứng Steam thật và thiết bị.
+Cập nhật 28/10/2026. Theo yêu cầu, Steam đã được thay hẳn bằng form email/password;
+không còn hạng mục xác minh Steam native. Auth hiện hành: [AUTH.md](AUTH.md).
 
 | Mốc | Trạng thái | Bằng chứng / phần còn lại |
 | --- | --- | --- |
-| 1. Nền chung | Đã triển khai | Contract/DTO hiện có + Teams search, DB migration, SessionStore, requireSession, ParseJobStore, factory tích hợp |
-| 2. Backend API | Đã triển khai | Router Pro/Auth/Me + server tích hợp; live trả 501 theo contract |
-| 3. Chức năng | Đã triển khai, chờ xác minh Steam thật | Pro services, OpenID/session, favorites/settings, notification producer và thông báo login; chưa có poller trận/favorite |
-| 4. Nối frontend | Đã triển khai | Pro/Team/League/Rankings, Settings/Account/Steam callback, favorites và notifications; Home pro previews/badge |
-| 5. Kiểm thử | Backend + frontend đạt tự động | Backend 65/65; frontend 18 passed/1 optional live test skipped; web/Android export qua; còn Steam thật và thiết bị |
-| 6. Git / bàn giao | Tài liệu local | Chưa commit/push/PR |
+| 1. Nền chung | Đã triển khai | Session/database/parse store dùng chung; migration 003 tách app user khỏi Dota ID, có backup và giữ dữ liệu cũ |
+| 2. Backend API | Đã triển khai | Pro/Me; register, login, session, logout, legacy credentials, Dota profile preference; endpoint Steam đã gỡ |
+| 3. Chức năng | Đã triển khai | Hash scrypt, giới hạn auth, session web/native, phân quyền favorites/settings/notifications/parse; chưa có reset/verify email hoặc poller kết quả nền |
+| 4. Nối frontend | Đã triển khai | Form đăng ký/đăng nhập trong app, tên/email tài khoản, chuyển credential cho user cũ; dùng được trên Expo Go |
+| 5. Kiểm thử | Tự động đạt; người dùng xác nhận checklist thủ công | Backend 101/101; E2E 25 passed, 1 optional live skipped; typecheck/lint/build/export qua. Người dùng xác nhận các mục đã test đúng mong muốn |
+| 6. Git / bàn giao | Bàn giao trên branch riêng | Mã Người 3 trước đây merge PR #2 (9761ede); phần mới bàn giao cùng Người 1 trên feature/players-matches-form-auth |
 
-Hướng dẫn file, lệnh chạy và ghép dependencies: [PART3_FOUNDATION.md](PART3_FOUNDATION.md).
+## Kết quả Auth mới
 
-Chi tiết API, env, cách chạy và giới hạn: [PART3_API.md](PART3_API.md).
-Frontend và cách chuẩn bị xác minh Steam: [PART3_FRONTEND.md](PART3_FRONTEND.md).
+- HTTP tests: register/login, password sai/email không tồn tại, validation, duplicate
+  registration đồng thời, cookie/Origin/Bearer, logout, rate limit và rollback.
+- Migration từ schema v2 giữ user ID, session và dữ liệu phụ thuộc; không gán tài khoản
+  cũ chỉ từ Dota ID. Legacy user còn session đặt credentials trong Settings.
+- Web E2E: đăng ký, refresh giữ session, favorites/settings/notifications persistence,
+  password sai/đúng, logout, account isolation và form validation.
+- Người dùng xác nhận đã test lại checklist và mọi thứ đúng mong muốn; đây là xác
+  nhận thủ công của người dùng, không thay thế bằng chứng tự động hoặc xác nhận riêng parse nguồn thật.
+- API công khai OpenDota không phụ thuộc email login; parse thật vẫn chưa kiểm.
 
-Kết quả local: typecheck + lint qua; **65/65 tests** (43 regression Người 2, 8 nền Người 3, 14 API/auth/me).
-Smoke qua health, pro players, leagues, team, roster, matches và teams list với OpenDota thật.
-Catalog teams thực tế lúc kiểm tra: 22.022 đội. Migration 002 chạy thành công trên DB local.
-Steam start/callback/exchange đã kiểm thử tự động bằng verifier/response giả lập;
-chưa đăng nhập tài khoản Steam thật hoặc kiểm thử trên thiết bị. Live giữ 501 theo contract.
+## Dữ liệu local
 
-Frontend: typecheck/lint qua; 3 bài E2E Người 3 chạy qua router/backend SQLite thật với upstream/Steam verifier fixture.
-Toàn suite 18 passed, 1 skipped (LIVE_PART2_API chưa bật). Export web và Android thành công;
-ảnh Pro Scene ở 360px: `frontend/test-results/part3-pro-360.png` (không đưa vào Git).
+Trước migration đã backup SQLite vào backend/data/opendota.sqlite.before-form-auth-*.backup.
+Migration đã kiểm số hàng users/sessions/favorites/settings/notifications/parse_jobs được
+giữ nguyên, foreign_key_check không có lỗi. Dừng hai backend cũ cùng cổng 3000 và khởi động
+một backend với Auth mới. Không commit database hoặc backup.
+
+## Lịch sử trước khi thay Auth
+
+Steam web login/callback và refresh giữ account từng được người dùng xác nhận.
+Android Expo Go đã mở UI/API công khai; các lỗi Home/Matches/Peers đã được người dùng
+xác nhận hết sau refresh/bản sửa hero_id=0. Luồng Steam native gặp lỗi mạng và không
+hỗ trợ callback trong Expo Go; người dùng đã chọn bỏ Steam, không tiếp tục hạng mục này.
+Các tài liệu PART3_FOUNDATION/API/FRONTEND cũ được giữ để tham khảo lịch sử và có banner
+trỏ sang AUTH.md.

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { OpenDotaClient } from '../../../../shared/api-contract.ts';
 import { HeroesService } from '../heroes/service.ts';
-import { endpoint, query, pagination, text, page, compareId } from '../part2/http.ts';
+import { endpoint, query, pagination, text, page, compareId } from '../../core/http.ts';
 export function createRouter(deps: { client: OpenDotaClient }) {
   const router = Router();
   const service = new HeroesService(deps.client);

@@ -18,7 +18,7 @@ export function useAccountQuery<T>(
   const { session } = useSession(),
     client = useQueryClient();
   const query = useQuery({
-    queryKey: ["account", session?.user.account_id, path, params],
+    queryKey: ["account", session?.user.user_id, path, params],
     queryFn: ({ signal }) => apiGet<T>(path, params, signal),
     enabled: !!session,
     retry: false,
@@ -45,7 +45,7 @@ export function useFavorites() {
   const { session } = useSession(),
     client = useQueryClient();
   const query = useQuery({
-    queryKey: ["account", session?.user.account_id, "favorites"],
+    queryKey: ["account", session?.user.user_id, "favorites"],
     enabled: !!session,
     retry: false,
     staleTime: 30000,

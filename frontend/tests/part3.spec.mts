@@ -1,3 +1,4 @@
+const webOrigin = `http://localhost:${process.env.E2E_WEB_PORT ?? "8081"}`;
 import { test, expect, type Page } from "@playwright/test";
 import type { AddressInfo } from "node:net";
 import { createApp } from "../../backend/src/app";
@@ -55,18 +56,11 @@ async function setup(page: Page) {
   const backend = createApp({
     client,
     databasePath: ":memory:",
-    allowedWebOrigins: ["http://localhost:8081"],
+    allowedWebOrigins: [webOrigin],
     auth: {
-      publicBaseUrl: "http://localhost:3000",
       production: false,
-      webOrigins: ["http://localhost:8081"],
-      webRedirects: ["http://localhost:8081/auth/callback"],
-      nativeRedirects: ["opendota://auth/callback"],
+      webOrigins: [webOrigin],
     },
-    verifySteam: async (_p, returnTo) => ({
-      account_id: identity.account,
-      nonce: returnTo,
-    }),
   });
   const server = backend.app.listen(0, "127.0.0.1");
   await new Promise<void>((r) => server.once("listening", r));
@@ -79,20 +73,6 @@ async function setup(page: Page) {
     });
     await route.fulfill({ response });
   });
-  // Only tests replace Steam identity verification; the actual backend exchanges code/session/cookies.
-  await page.route(
-    "https://steamcommunity.com/openid/login?**",
-    async (route) => {
-      const returnTo = new URL(route.request().url()).searchParams.get(
-        "openid.return_to",
-      )!;
-      await route.fulfill({
-        status: 302,
-        headers: { location: returnTo },
-        body: "",
-      });
-    },
-  );
   return {
     backend,
     identity,
@@ -104,14 +84,6 @@ async function setup(page: Page) {
     },
   };
 }
-async function signIn(page: Page) {
-  await page.goto("/settings", { waitUntil: "domcontentloaded" });
-  await page
-    .getByRole("button", { name: "Sign in with Steam", exact: true })
-    .click();
-  await expect(page.getByText(/Steam account \d/)).toBeVisible();
-}
-
 test("Pro Scene uses real backend routers: tabs, pagination, team/league details and unavailable live", async ({
   page,
 }) => {
@@ -157,66 +129,92 @@ test("Pro Scene uses real backend routers: tabs, pagination, team/league details
     await fixture.close();
   }
 });
-test("Steam web callback establishes cookie session, syncs favorites/settings/notifications and isolates accounts", async ({
+
+async function register(page: Page, email: string, name: string) {
+  await page.goto("/settings");
+  await page
+    .getByRole("button", { name: "Create an account", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Display name", exact: true })
+    .fill(name);
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill(email);
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("A strong password 123");
+  await page
+    .getByLabel("Confirm password", { exact: true })
+    .fill("A strong password 123");
+  await page.getByRole("button", { name: "Register", exact: true }).click();
+  await expect(page.getByText(email, { exact: true })).toBeVisible();
+}
+test("form registration, cookie persistence, favorites/settings/notifications, login and account isolation", async ({
   page,
 }) => {
-  const fixture = await setup(page);
-  const errors: string[] = [];
+  const fixture = await setup(page),
+    errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   try {
-    await signIn(page);
-    await expect(
-      page.getByText("Steam account 1", { exact: true }),
-    ).toBeVisible();
-    const user = fixture.backend.foundation.sessions;
-    // Guest sample favorites must not be silently imported when signing in.
-    expect(
-      fixture.backend.foundation.me.favorites(
-        user.createForVerifiedAccount("1", "native").principal.user_id,
-      ),
-    ).toHaveLength(0);
-    await page.goto("/team?id=1", { waitUntil: "domcontentloaded" });
+    await register(page, "first@example.com", "First User");
+    await page.goto("/team?id=1");
     await page
       .getByRole("button", { name: "Favorite team", exact: true })
       .click();
     await expect(
       page.getByRole("button", { name: "Remove team favorite", exact: true }),
     ).toBeVisible();
-    await page.goto("/favorites", { waitUntil: "domcontentloaded" });
+    await page.goto("/favorites");
     await page.getByRole("button", { name: "Teams", exact: true }).click();
     await expect(page.getByText("API Team 1", { exact: true })).toBeVisible();
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.reload();
     await page.getByRole("button", { name: "Teams", exact: true }).click();
     await expect(page.getByText("API Team 1", { exact: true })).toBeVisible();
-    await page.goto("/notifications", { waitUntil: "domcontentloaded" });
+    await page.goto("/notifications");
     await expect(
-      page.getByText("Steam sign-in successful", { exact: true }),
+      page.getByText("Sign-in successful", { exact: true }),
     ).toBeVisible();
     await page
       .getByRole("button", { name: "Mark all read", exact: true })
       .click();
     await expect(page.getByText("0 unread", { exact: true })).toBeVisible();
-    await page.goto("/settings", { waitUntil: "domcontentloaded" });
+    await page.goto("/settings");
     await page
       .getByRole("switch", { name: "Enable in-app notifications" })
       .click();
     await expect(
       page.getByRole("switch", { name: "Enable in-app notifications" }),
     ).not.toBeChecked();
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.reload();
+    await expect(
+      page.getByText("first@example.com", { exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByRole("switch", { name: "Enable in-app notifications" }),
     ).not.toBeChecked();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "Sign in with Steam", exact: true }),
+      page.getByRole("button", { name: "Sign in", exact: true }),
     ).toBeVisible();
-    fixture.identity.account = "2";
-    await signIn(page);
+    await page
+      .getByRole("textbox", { name: "Email", exact: true })
+      .fill("first@example.com");
+    await page
+      .getByLabel("Password", { exact: true })
+      .fill("wrong password 123");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(
-      page.getByText("Steam account 2", { exact: true }),
+      page.getByText("Email or password is incorrect."),
     ).toBeVisible();
-    await page.goto("/favorites", { waitUntil: "domcontentloaded" });
+    await page
+      .getByLabel("Password", { exact: true })
+      .fill("A strong password 123");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(
+      page.getByText("first@example.com", { exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await register(page, "second@example.com", "Second User");
+    await page.goto("/favorites");
     await page.getByRole("button", { name: "Teams", exact: true }).click();
     await expect(
       page.getByText("No favorites yet.", { exact: true }),
@@ -227,25 +225,36 @@ test("Steam web callback establishes cookie session, syncs favorites/settings/no
     await fixture.close();
   }
 });
-test("callback rejects missing local state without exchanging a code; API failures show retry", async ({
-  page,
-}) => {
+test("form validation and API errors remain recoverable", async ({ page }) => {
   const fixture = await setup(page);
   try {
-    await page.goto("/auth/callback?code=forged&state=forged", {
-      waitUntil: "domcontentloaded",
-    });
-    await expect(
-      page.getByText("Steam sign-in failed", { exact: true }),
-    ).toBeVisible();
-    await expect(page).toHaveURL(/\/auth\/callback$/);
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByText("Enter a valid email.")).toBeVisible();
+    await page
+      .getByRole("button", { name: "Create an account", exact: true })
+      .click();
+    await page
+      .getByRole("textbox", { name: "Display name", exact: true })
+      .fill("Test User");
+    await page
+      .getByRole("textbox", { name: "Email", exact: true })
+      .fill("test@example.com");
+    await page
+      .getByLabel("Password", { exact: true })
+      .fill("A strong password 123");
+    await page
+      .getByLabel("Confirm password", { exact: true })
+      .fill("Different password 123");
+    await page.getByRole("button", { name: "Register", exact: true }).click();
+    await expect(page.getByText("Passwords do not match.")).toBeVisible();
     await page.route("**/api/v1/pro/teams?**", (route) =>
       route.fulfill({
         status: 504,
         json: { error: { message: "OpenDota request failed" } },
       }),
     );
-    await page.goto("/rankings", { waitUntil: "domcontentloaded" });
+    await page.goto("/rankings");
     await expect(
       page.getByText("OpenDota request failed", { exact: true }),
     ).toBeVisible();

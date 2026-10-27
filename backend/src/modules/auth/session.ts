@@ -1,7 +1,7 @@
 import type { RequestHandler, Response } from "express";
 import type { SessionPrincipal } from "../../../../shared/api-contract.ts";
 import type { SessionStore } from "../../database/session-store.ts";
-import { ApiError } from "../part2/http.ts";
+import { ApiError } from "../../core/http.ts";
 
 export const SESSION_COOKIE = "opendota_session";
 export function sessionCookieOptions(production: boolean) {

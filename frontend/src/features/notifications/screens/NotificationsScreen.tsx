@@ -25,7 +25,7 @@ function AccountNotifications() {
     unread = useUnread(),
     client = useQueryClient();
   const query = useInfiniteQuery({
-    queryKey: ["account", session?.user.account_id, "notifications", filter],
+    queryKey: ["account", session?.user.user_id, "notifications", filter],
     initialPageParam: 0,
     queryFn: ({ pageParam, signal }) =>
       apiGet<Page<Notification>>(

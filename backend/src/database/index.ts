@@ -21,21 +21,23 @@ export function transaction<T>(db: DatabaseSync, action: () => T): T {
 }
 
 export function migrate(db: DatabaseSync): void {
-  const migrations = ["001-foundation.sql", "002-auth.sql"].map(
-    (file, index) => {
-      const sql = readFileSync(
-        new URL(`./migrations/${file}`, import.meta.url),
-        "utf8",
-      );
-      return {
-        version: index + 1,
-        sql,
-        checksum: createHash("sha256")
-          .update(sql.replaceAll("\r\n", "\n"))
-          .digest("hex"),
-      };
-    },
-  );
+  const migrations = [
+    "001-foundation.sql",
+    "002-auth.sql",
+    "003-password-auth.sql",
+  ].map((file, index) => {
+    const sql = readFileSync(
+      new URL(`./migrations/${file}`, import.meta.url),
+      "utf8",
+    );
+    return {
+      version: index + 1,
+      sql,
+      checksum: createHash("sha256")
+        .update(sql.replaceAll("\r\n", "\n"))
+        .digest("hex"),
+    };
+  });
   transaction(db, () => {
     db.exec(
       "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, checksum TEXT NOT NULL, applied_at TEXT NOT NULL) STRICT",

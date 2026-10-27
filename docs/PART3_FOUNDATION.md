@@ -1,3 +1,5 @@
+> Cập nhật 28/10/2026: Steam đã được thay bằng form email/password. Auth hiện hành và migration xem [AUTH.md](AUTH.md); các mục Steam bên dưới chỉ ghi lại mốc kiểm thử cũ.
+
 # Người 3 — nền chung
 
 Ngày cập nhật: 27/10/2026. Áp dụng API contract v1; không đổi wire DTO.

@@ -10,7 +10,6 @@ import type { AuthConfig } from "./modules/auth/service.ts";
 import { createRouter as proRouter } from "./modules/pro/index.ts";
 import { createRouter as meRouter } from "./modules/me/index.ts";
 import { createRouter as authRouter } from "./modules/auth/index.ts";
-import type { createSteamVerifier } from "./modules/auth/steam.ts";
 
 /** Composition helper for the main app owner. Does not listen, register routes or create tokens. */
 export function createPart3Foundation(options: {
@@ -18,7 +17,6 @@ export function createPart3Foundation(options: {
   databasePath: string;
   allowedWebOrigins: readonly string[];
   auth?: AuthConfig;
-  verifySteam?: ReturnType<typeof createSteamVerifier>;
 }) {
   const origins = new Set(options.allowedWebOrigins);
   for (const origin of origins) {
@@ -34,8 +32,7 @@ export function createPart3Foundation(options: {
   const me = createMeStore(db);
   let auth: ReturnType<typeof createAuthService> | undefined;
   try {
-    if (options.auth)
-      auth = createAuthService(db, sessions, options.auth, options.verifySteam);
+    if (options.auth) auth = createAuthService(db, sessions, options.auth);
   } catch (error) {
     db.close();
     throw error;

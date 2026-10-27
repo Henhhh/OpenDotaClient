@@ -1,60 +1,54 @@
 import { View } from "react-native";
-import { ME_ID } from "@/features/players/data/players";
-import { playerMatches, isWin } from "@/features/matches/data/matches";
-import { fmtDuration } from "@/shared/utils/format";
+import type { PlayerStats } from "@/shared/api/client";
+import { usePlayerApi, validAccount } from "../api/queries";
+import { ApiState, rate } from "@/shared/ui/ApiState";
 import { Card } from "@/shared/ui/Card";
-import { Ring } from "@/shared/ui/Ring";
 import { Txt } from "@/shared/ui/Txt";
-import { C, s } from "@/shared/theme/theme";
-import { ResultStrip } from "@/shared/ui/ResultStrip";
-
-export function RecentForm({ id = ME_ID }: { id?: number }) {
-  const rows = playerMatches(id).slice(0, 20),
-    wins = rows.filter(isWin).length;
-  const avg = (fn: (m: (typeof rows)[number]) => number) =>
-    rows.reduce((s, m) => s + fn(m), 0) / rows.length;
+import { fmtDuration } from "@/shared/utils/format";
+import { s } from "@/shared/theme/theme";
+import { Ring } from "@/shared/ui/Ring";
+export function RecentForm({ id }: { id: string }) {
+  const q = usePlayerApi<PlayerStats>(
+    `/players/${id}/stats`,
+    { scope: "recent" },
+    validAccount(id),
+  );
+  const d = q.data?.data,
+    n = (v: number | null) => (v == null ? "—" : v.toFixed(1));
   return (
     <Card>
-      <View style={s.row}>
-        <Ring value={wins / rows.length} />
-        <View style={{ flex: 1, gap: 10 }}>
+      <ApiState
+        pending={q.isPending}
+        error={q.error}
+        retry={() => void q.refetch()}
+      />
+      {d && (
+        <>
+          {d.win_rate == null ? (
+            <Txt bold size={24}>
+              {rate(d.win_rate)}
+            </Txt>
+          ) : (
+            <Ring value={d.win_rate} />
+          )}
+          <Txt>
+            {d.wins}W · {d.losses}L · {d.matches} recent matches
+          </Txt>
           <View style={s.between}>
-            <View>
-              <Txt muted size={9}>
-                AVG K/D/A
-              </Txt>
-              <Txt bold>
-                {avg((m) => m.kills).toFixed(1)}/
-                {avg((m) => m.deaths).toFixed(1)}/
-                {avg((m) => m.assists).toFixed(1)}
-              </Txt>
-            </View>
-            <View>
-              <Txt muted size={9}>
-                AVG GPM
-              </Txt>
-              <Txt color={C.gold} bold>
-                {Math.round(avg((m) => m.gold_per_min))}
-              </Txt>
-            </View>
+            <Txt>AVG K/D/A</Txt>
+            <Txt>
+              {n(d.avg_kills)}/{n(d.avg_deaths)}/{n(d.avg_assists)}
+            </Txt>
           </View>
           <View style={s.between}>
-            <View>
-              <Txt muted size={9}>
-                AVG XPM
-              </Txt>
-              <Txt bold>{Math.round(avg((m) => m.xp_per_min))}</Txt>
-            </View>
-            <View>
-              <Txt muted size={9}>
-                AVG LENGTH
-              </Txt>
-              <Txt bold>{fmtDuration(avg((m) => m.duration))}</Txt>
-            </View>
+            <Txt>GPM {n(d.avg_gpm)}</Txt>
+            <Txt>XPM {n(d.avg_xpm)}</Txt>
+            <Txt>
+              {d.avg_duration == null ? "—" : fmtDuration(d.avg_duration)}
+            </Txt>
           </View>
-        </View>
-      </View>
-      <ResultStrip results={[...rows].reverse().map(isWin)} />
+        </>
+      )}
     </Card>
   );
 }

@@ -1,39 +1,56 @@
 import { useState } from "react";
-import { ME_ID } from "@/features/players/data/players";
-import { playerMatches } from "@/features/matches/data/matches";
-import { kdaRatio } from "@/shared/utils/format";
+import type { Page, PlayerMatch } from "@/shared/api/client";
+import { usePlayerApi, validAccount } from "../api/queries";
+import { ApiState } from "@/shared/ui/ApiState";
 import { Card } from "@/shared/ui/Card";
 import { Choices } from "@/shared/ui/Choices";
 import { Spark } from "@/shared/ui/Spark";
 import { Txt } from "@/shared/ui/Txt";
-import { C } from "@/shared/theme/theme";
-
-export function Performance({ id = ME_ID }: { id?: number }) {
-  const [metric, setMetric] = useState("GPM");
-  const rows = [...playerMatches(id).slice(0, 20)].reverse(),
-    values = rows.map((m) =>
-      metric === "GPM"
-        ? m.gold_per_min
-        : metric === "XPM"
-          ? m.xp_per_min
-          : metric === "Damage"
-            ? m.hero_damage
-            : kdaRatio(m.kills, m.deaths, m.assists),
-    );
+export function Performance({ id }: { id: string }) {
+  const [metric, setMetric] = useState("KDA");
+  const q = usePlayerApi<Page<PlayerMatch>>(
+    `/players/${id}/matches`,
+    { limit: 20 },
+    validAccount(id),
+  );
+  const rows = [...(q.data?.data.items ?? [])].reverse();
+  const values = rows.map((m) =>
+    metric === "GPM"
+      ? m.gold_per_min
+      : metric === "XPM"
+        ? m.xp_per_min
+        : (m.kills + m.assists) / Math.max(1, m.deaths),
+  );
+  const complete = values.length > 0 && values.every((v) => v !== null);
   return (
     <Card>
       <Choices
         segmented
-        items={["GPM", "XPM", "KDA", "Damage"]}
+        items={["KDA", "GPM", "XPM"]}
         value={metric}
         onChange={setMetric}
       />
-      <Txt bold size={24}>
-        {(values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)}
-      </Txt>
-      <Spark values={values} color={metric === "KDA" ? C.red : C.gold} />
+      <ApiState
+        pending={q.isPending}
+        error={q.error}
+        retry={() => void q.refetch()}
+      />
+      {!q.error &&
+        q.data &&
+        (complete ? (
+          <Spark
+            key={`${id}:${metric}:${values.length}`}
+            values={values as number[]}
+          />
+        ) : (
+          <Txt muted>
+            {values.length
+              ? "This metric is unavailable for part of the loaded history."
+              : "No recent matches."}
+          </Txt>
+        ))}
       <Txt muted size={10}>
-        Last 20 matches · Tap the chart to inspect
+        Up to 20 latest matches · {metric}
       </Txt>
     </Card>
   );

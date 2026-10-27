@@ -11,7 +11,7 @@ Thay đổi phá vỡ contract phải được cả ba thống nhất, cập nh�
 | --- | --- | --- | --- |
 | 1 | Khung Express/TypeScript, validate Zod, response/error, Players, Matches, parse, ghép route | `src/core`, `src/modules/players`, `src/modules/matches` | players, matches, dữ liệu trận của builds |
 | 2 — bạn | OpenDota client/cache, Heroes, Search, constants | `src/integrations/opendota`, `src/modules/heroes`, `src/modules/search`, `src/modules/constants` | heroes, search, dữ liệu hero/item của builds |
-| 3 | Pro Scene, Steam auth, DB/migration, favorites/settings/notifications | `src/modules/pro`, `src/modules/auth`, `src/modules/me`, `src/database` | pro-scene, favorites, notifications, settings |
+| 3 | Pro Scene, form auth, DB/migration, favorites/settings/notifications | `src/modules/pro`, `src/modules/auth`, `src/modules/me`, `src/database` | pro-scene, favorites, notifications, settings |
 
 - Người 1 sở hữu bootstrap, router gốc, middleware và cấu hình build backend.
 - Người 2 sở hữu transport upstream; người 1/3 không tạo HTTP client riêng.
@@ -20,7 +20,7 @@ Thay đổi phá vỡ contract phải được cả ba thống nhất, cập nh�
 - Home dùng lại query Players/Heroes/Pro; người 1 ghép Home sau khi endpoint ổn định.
 - Không thêm endpoint dashboard tổng hợp trong v1. Compare thuộc người 1; Search gọi service Teams của người 3.
 - Đợt A: health + client + Players/Matches/Heroes/Search/Pro cơ bản.
-- Đợt B: parse, hero rankings, Steam login, đồng bộ và thông báo trong app.
+- Đợt B: parse, hero rankings, email/password login, đồng bộ và thông báo trong app.
 - Endpoint ghi B chưa triển khai phải trả `501 FEATURE_UNAVAILABLE`; không trả dữ liệu mẫu.
 
 ## 2. Quy ước HTTP và dữ liệu
@@ -28,7 +28,7 @@ Thay đổi phá vỡ contract phải được cả ba thống nhất, cập nh�
 - Base URL local: `http://localhost:3000/api/v1`; điện thoại dùng IP LAN của máy chạy backend.
 - Production dùng HTTPS; FE đọc `EXPO_PUBLIC_API_BASE_URL`. API key upstream chỉ nằm backend.
 - JSON UTF-8; tên field `snake_case`. DTO API độc lập với kiểu mock frontend.
-- Mọi ID trên dây là chuỗi: `"17"`, `"8312547001"`. ID số chỉ nhận chuỗi chữ số dương, không dấu, không số mũ; giới hạn 20 ký tự. Job/notification ID opaque tối đa 128 ký tự.
+- Mọi ID trên dây là chuỗi: `"17"`, `"8312547001"`. ID số chỉ nhận chuỗi chữ số dương, không dấu, không số mũ; giới hạn 20 ký tự. User/job/notification ID opaque tối đa 128 ký tự.
 - `account_id` là Steam account ID 32-bit, không phải SteamID64. `steam_id` giữ chuỗi SteamID64.
 - Thời điểm dữ liệu trận: Unix giây UTC; `duration`, `game_time`, thời gian mua đồ: giây.
 - `fetched_at`, `created_at`, `expires_at`, `read_at`: RFC3339 UTC (đuôi Z).
@@ -164,24 +164,28 @@ Không suy game thắng thành tỷ số series Bo3/Bo5. Rankings đội dùng `
 rankings người chơi theo hero dùng endpoint người 2. Không có bảng MMR toàn cầu trong v1.
 Live polling FE ít nhất 30s khi màn hình foreground; không cam kết realtime hoặc lịch upcoming.
 
-### Auth B — Steam OpenID + session
+### Auth B — form email/password + session
+
+Steam/OpenID đã được thay ngày 28/10/2026 theo yêu cầu. Không còn start/callback/exchange.
+Chi tiết validation, migration và giới hạn tại [AUTH.md](AUTH.md).
 
 | Method + path | Input / auth | Kết quả |
 | --- | --- | --- |
-| POST `/auth/steam/start` | `{redirect_uri, platform:"web"\|"native"}`; public | Success<LoginStart> |
-| GET `/auth/steam/callback` | Steam OpenID query; chỉ callback server kiểm chứng | 302 tới redirect đã lưu với `code` và `state` |
-| POST `/auth/exchange` | `{code,state}`; public; code một lần | web: Success<Session> + cookie; native: Success<{session:Session,access_token:string}> |
-| GET `/auth/session` | session bắt buộc | Success<Session> |
-| POST `/auth/logout` | session bắt buộc; body `{}` | 204, thu hồi session |
+| POST /auth/register | {email,password,name,platform:web hoặc native}; public | web: Success<Session> + cookie; native: Success<NativeSession> |
+| POST /auth/login | {email,password,platform:web hoặc native}; public | web: Success<Session> + cookie; native: Success<NativeSession> |
+| GET /auth/session | session | Success<Session> |
+| POST /auth/logout | {}, session | 204, thu hồi token |
+| POST /auth/credentials | {email,password,name}, session legacy chưa có email | Success<Session>, giữ nguyên user_id |
+| PATCH /auth/profile | {dota_account_id:Id hoặc null}, session | Success<Session> |
 
-Người 3 lưu state ngẫu nhiên, redirect allowlist và hạn start 10 phút. Kiểm chứng callback
-với Steam, nonce/replay và state. Code callback opaque một lần, hết hạn 60s; không gửi token qua URL.
-Session server-side opaque hết hạn 7 ngày, logout thu hồi ngay. Web dùng cookie HttpOnly,
-Secure ở production, SameSite=Lax; native dùng Bearer access_token và lưu bằng secure storage.
-Web mutation kiểm Origin theo allowlist, chỉ nhận JSON; CORS credentials chỉ origin được phép.
-Không nhận account_id từ FE để quyết định chủ sở hữu. Không ghi token/code vào log.
-Sai/hết hạn code/state trả 401; redirect không allowlist trả 400.
-Đây là thiết kế nội bộ; cần kiểm thử luồng Steam/native riêng trước khi bật B.
+Session.user là AppUser {user_id,email,name,dota_account_id}; user_id là UUID app,
+không phải account_id của OpenDota. Email nullable cho user legacy chưa đặt credentials.
+Dota ID là lựa chọn xem công khai, không xác minh sở hữu, không gộp dữ liệu tài khoản.
+Mật khẩu scrypt có salt; session opaque server-side 7 ngày. Web dùng cookie HttpOnly,
+Secure production, SameSite=Lax và Origin allowlist. Native dùng Bearer/SecureStore,
+hoạt động trong Expo Go. Sai credential 401, email trùng 409, quá nhiều thử 429.
+Không gửi token trong URL hoặc web response JSON. Không nhận user_id từ form để chọn chủ sở hữu.
+
 
 ### Dữ liệu cá nhân B — tất cả bắt buộc session
 
@@ -252,7 +256,7 @@ Tham khảo [OpenDota API chính thức](https://docs.opendota.com/) và
 | Search player | `/search?q=...`; hero/team tìm trong catalog/cache |
 | Pro | `/proMatches`, `/teams`, `/teams/{team_id}` và subresource, `/proPlayers`, `/leagues` và subresource |
 | Live / rank history | `/live`, `/players/{account_id}/ratings` là ứng viên; xác minh coverage và mapping trước bật |
-| Auth/personal | Steam OpenID và database ứng dụng; không lấy từ OpenDota |
+| Auth/personal | Email/password và database ứng dụng; không lấy từ OpenDota |
 
 Không cam kết tất cả filter nội bộ được upstream hỗ trợ trực tiếp. Chủ module phải
 chứng minh query hoặc cách aggregate đầy đủ trước khi đánh dấu endpoint hoàn thành.
@@ -347,8 +351,7 @@ nằm cuối shared/api-contract.ts; chúng không phải JSON DTO gửi cho fro
   fetched_at của nguồn; aggregate nhiều nguồn dùng thời điểm cũ nhất của dữ liệu cấu thành.
   unavailable_fields dùng JSON Pointer vào toàn response, gồm /data/items/0/... nếu cần.
 - 429 luôn có Retry-After dạng số giây nguyên >=1; khi chưa biết upstream retry time dùng 60 giây.
-- LoginStart có state để frontend giữ và so callback. Web exchange ràng buộc với cookie
-  flow HttpOnly do start tạo; native dùng state frontend đã giữ. Không chỉ so hai giá trị từ URL.
+- Form Auth: user_id là UUID app; Dota ID là preference không xác minh sở hữu.
 - GET /me/notifications?unread=false chỉ trả đã đọc; bỏ unread trả cả hai.
 - Purchase.time và LiveMatch.game_time có thể âm khi trước khi trận bắt đầu.
   Không áp quy tắc timestamp không âm cho hai duration tương đối này.

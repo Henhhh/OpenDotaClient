@@ -45,6 +45,7 @@ example
 
 # Native exports and browser test artifacts
 dist-native/
+dist-android/
 test-results/
 playwright-report/
 home-preview.png

@@ -1,4 +1,19 @@
-# Backend — nền chung phần 2
+# Backend — OpenDota Mobile
+
+Auth hiện dùng form email/password, không dùng Steam. Xem [AUTH.md](../docs/AUTH.md)
+về endpoint, bảo toàn dữ liệu tài khoản cũ và giới hạn. Bật ENABLE_ACCOUNT_FEATURES=true.
+Hướng dẫn callback/Steam trong các tài liệu cũ đã được thay thế.
+
+Nền Người 1 đã chuẩn hóa helper dùng chung ở `src/core`, cấu hình bootstrap và build JavaScript.
+Xem [PART1_FOUNDATION.md](../docs/PART1_FOUNDATION.md) và [PART1_PROGRESS.md](../docs/PART1_PROGRESS.md).
+`npm run build` → `npm run smoke:build` → `npm start`; dev vẫn dùng `npm run dev`.
+Các hướng dẫn phần 2/3 bên dưới tiếp tục áp dụng; import helper cũ được giữ tương thích.
+
+API Players/Matches/compare và parse đã ghép vào server chính:
+[PART1_API.md](../docs/PART1_API.md). `npm run test:part1` kiểm nền và nghiệp vụ offline;
+`npm run smoke:part1` gọi GET nguồn thật (không gửi parse/đăng nhập Steam).
+Parse mặc định tắt; cần `ENABLE_MATCH_PARSE=true` cùng account features/session đã cấu hình.
+Frontend Players/Matches đã nối API; hướng dẫn tại [PART1_FRONTEND.md](../docs/PART1_FRONTEND.md).
 
 Nền chung Người 3 (Teams search, SQLite migration, session và parse store) đã có tại
 [PART3_FOUNDATION.md](../docs/PART3_FOUNDATION.md); tiến độ và kiểm thử tại
@@ -12,7 +27,7 @@ chỉ để người 2 kiểm thử riêng; người 1 ghép router vào server 
 Yêu cầu Node.js >=24; Node chạy trực tiếp TypeScript bằng type stripping.
 
 ```powershell
-cd D:\mobi\OpenDotaClient\backend
+cd D:\Study\Project\OpenDotaClient\backend
 npm.cmd ci
 npm.cmd run check
 ```

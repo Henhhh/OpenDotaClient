@@ -76,8 +76,10 @@ export interface Team { team_id: Id; name: string; tag: string | null; logo_url:
 export interface ProPlayer extends PlayerSummary { team_id: Id | null; team_name: string | null; real_name: string | null; role: string | null }
 export interface League { league_id: Id; name: string; tier: string | null; start_time: UnixSeconds | null; end_time: UnixSeconds | null; prize_usd: number | null; status: 'live' | 'upcoming' | 'completed' | null }
 export interface LiveMatch { live_id: Id; match_id: Id | null; league_id: Id | null; radiant_team_id: Id | null; dire_team_id: Id | null; game_time: number | null; radiant_score: number | null; dire_score: number | null; spectators: number | null }
-export interface Session { user: PlayerSummary; expires_at: string }
-export interface LoginStart { authorization_url: string; state: string; expires_at: string }
+export interface AppUser { user_id: Id; email: string | null; name: string; dota_account_id: Id | null }
+export interface Session { user: AppUser; expires_at: string }
+export interface LoginRequest { email: string; password: string; platform: 'web' | 'native' }
+export interface RegisterRequest extends LoginRequest { name: string }
 export type FavoriteKind = 'hero' | 'player' | 'team';
 export interface Favorite { kind: FavoriteKind; entity_id: Id; created_at: string }
 export interface Settings { theme: 'dark' | 'light' | 'system'; language: 'vi' | 'en'; in_app_notifications: boolean }
@@ -110,7 +112,7 @@ export interface UpstreamError extends Error {
 export interface TeamSearchService {
   search(q: string, limit: number, options: { deadline_ms: number; signal?: AbortSignal }): Promise<UpstreamResult<Team[]>>;
 }
-export interface SessionPrincipal { user_id: string; account_id: Id }
+export interface SessionPrincipal { user_id: string; account_id: Id | null }
 export interface ParseJobStore {
   /** Atomic: reuse an active job by match and grant this user access, or reserve one. */
   reserve(match_id: Id, user_id: string): Promise<{ job: ParseJob; created: boolean }>;
@@ -121,7 +123,5 @@ export interface ParseJobStore {
   setUpstreamJobId(job_id: Id, upstream_job_id: string): Promise<void>;
   getUpstreamJobId(job_id: Id): Promise<string | null>;
 }
-export interface LoginStartRequest { redirect_uri: string; platform: 'web' | 'native' }
-export interface LoginExchangeRequest { code: string; state: string }
 export interface NativeSession { session: Session; access_token: string }
 export type SettingsPatch = Partial<Settings>;
