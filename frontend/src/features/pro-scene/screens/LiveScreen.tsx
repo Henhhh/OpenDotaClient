@@ -1,17 +1,18 @@
 import { View } from "react-native";
-import { LIVE_MATCHES } from "@/features/pro-scene/data/pro";
-import { Notice } from "@/shared/ui/Notice";
-import { LiveCard } from "@/features/pro-scene/components/LiveCard";
-
+import { usePro } from "../api/queries";
+import { ApiState } from "@/shared/ui/ApiState";
+import { Txt } from "@/shared/ui/Txt";
+import type { Page, LiveMatch } from "@/shared/api/client";
 export function Live() {
+  const query = usePro<Page<LiveMatch>>("/pro/live");
   return (
-    <View style={{ gap: 14 }}>
-      <Notice>
-        Mock preview. Scores, heroes and timers are simulated, not live.
-      </Notice>
-      {LIVE_MATCHES.map((m) => (
-        <LiveCard key={m.id} m={m} />
-      ))}
+    <View style={{ gap: 12 }}>
+      <ApiState
+        pending={query.isPending}
+        error={query.error}
+        retry={() => void query.refetch()}
+      />
+      {query.data && <Txt>No live matches available.</Txt>}
     </View>
   );
 }

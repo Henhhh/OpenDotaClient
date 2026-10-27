@@ -19,7 +19,7 @@ import { go } from "@/shared/navigation/navigation";
 import { Build } from "@/features/builds/screens/BuildScreen";
 export function HeroDetail({ id }: { id: number }) {
   const [tab, setTab] = useState("Overview");
-  const [favorite, toggle] = useFavorite("heroes", id);
+  const [favorite, toggle, favoriteState] = useFavorite("heroes", id);
   const hero = useHero(id),
     stats = useStats(undefined, tab === "Statistics"),
     matchups = useMatchups(id, tab === "Matchups"),
@@ -51,6 +51,7 @@ export function HeroDetail({ id }: { id: number }) {
       <Txt muted>
         {h.primary_attr.toUpperCase()} · {h.attack_type} · {h.roles.join(", ")}
       </Txt>
+      {favoriteState.error && <Notice>{favoriteState.error.message}</Notice>}
       <Choices
         items={["Overview", "Statistics", "Matchups", "Builds", "Players"]}
         value={tab}

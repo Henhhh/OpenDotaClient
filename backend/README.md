@@ -1,5 +1,12 @@
 # Backend — nền chung phần 2
 
+Nền chung Người 3 (Teams search, SQLite migration, session và parse store) đã có tại
+[PART3_FOUNDATION.md](../docs/PART3_FOUNDATION.md); tiến độ và kiểm thử tại
+[PART3_PROGRESS.md](../docs/PART3_PROGRESS.md). Chạy `npm run db:migrate` để tạo/cập nhật DB local,
+`npm run test:part3` để kiểm tra Người 3. API nghiệp vụ Pro/Auth/Me và server tích hợp đã có:
+[PART3_API.md](../docs/PART3_API.md). Dùng `npm run dev`; account features mặc định tắt,
+bật bằng env sau khi cấu hình allowlist/callback. Live hiện trả 501 theo contract.
+
 Đã có OpenDota transport và router Heroes, constants, Search. Express host `part2-dev.ts`
 chỉ để người 2 kiểm thử riêng; người 1 ghép router vào server chính.
 Yêu cầu Node.js >=24; Node chạy trực tiếp TypeScript bằng type stripping.

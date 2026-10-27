@@ -15,10 +15,11 @@ import { useFavorite } from "@/shared/state/AppState";
 export function ProfileHeader({ id = ME_ID }: { id?: number }) {
   const p = getPlayer(id);
   const [copied, setCopied] = useState(false);
-  const [favorite, toggle] = useFavorite("players", id);
+  const [favorite, toggle, favoriteState] = useFavorite("players", id);
   if (!p) return <Empty text="Private or unknown player profile" />;
   return (
     <View style={{ gap: 16 }}>
+      {favoriteState.error && <Txt>{favoriteState.error.message}</Txt>}
       <View style={s.row}>
         <Art hero={p.avatarHero} width={64} height={64} />
         <View style={{ flex: 1 }}>
