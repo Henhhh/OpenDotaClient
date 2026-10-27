@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useIsFetching } from "@tanstack/react-query";
 import { loadCatalog } from "@/core/catalog";
 import { Home } from "@/features/home/screens/HomeScreen";
 import { Matches } from "@/features/matches/screens/MatchesScreen";
@@ -59,6 +59,15 @@ const TITLES: Record<string, string> = {
 };
 
 export function Screen({ name }: { name: string }) {
+  const queryClient = useQueryClient();
+  const liveScreen = [
+    "heroes",
+    "hero",
+    "heroRanks",
+    "search",
+    "build",
+  ].includes(name);
+  const liveFetching = useIsFetching({ queryKey: ["part2"] });
   const [grid, setGrid] = useState(true);
   const params = useLocalSearchParams<{
     id?: string;
@@ -76,6 +85,12 @@ export function Screen({ name }: { name: string }) {
     staleTime: 60_000,
   });
   const refresh = () => {
+    if (liveScreen) {
+      void queryClient
+        .invalidateQueries({ queryKey: ["part2"] })
+        .then(() => setRefreshed(true));
+      return;
+    }
     void query.refetch().then(() => setRefreshed(true));
   };
   const root = ["home", "matches", "heroes", "pro", "profile"].includes(name);
@@ -194,7 +209,7 @@ export function Screen({ name }: { name: string }) {
           )}
           {name === "heroes" && (
             <Txt muted size={10}>
-              127 heroes · sample meta stats
+              OpenDota hero catalog
             </Txt>
           )}
           {name === "pro" && (
@@ -288,7 +303,7 @@ export function Screen({ name }: { name: string }) {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={query.isFetching}
+              refreshing={liveScreen ? liveFetching > 0 : query.isFetching}
               onRefresh={refresh}
               tintColor={C.red}
             />
@@ -297,7 +312,7 @@ export function Screen({ name }: { name: string }) {
         >
           {refreshed && (
             <Txt muted size={10}>
-              Sample data refreshed ·{" "}
+              {liveScreen ? "API data refreshed" : "Sample data refreshed"} ·{" "}
               {new Date(query.data.refreshedAt).toLocaleTimeString()}
             </Txt>
           )}

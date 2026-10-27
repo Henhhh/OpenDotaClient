@@ -1,18 +1,16 @@
 import { useState } from "react";
-import { Image, View } from "react-native";
-import { getHero, getAbilities } from "@/features/heroes/data/heroes";
-import { buildFor, getItem } from "@/features/builds/data/builds";
-import { getMatch } from "@/features/matches/data/matches";
-import { itemImg } from "@/shared/utils/assets";
-import { fmtDuration } from "@/shared/utils/format";
-import { C, s } from "@/shared/theme/theme";
-import { Badge } from "@/shared/ui/Badge";
+import { View } from "react-native";
+import {
+  useHero,
+  useItems,
+  usePopularity,
+} from "@/features/heroes/api/queries";
+import { ApiState, RemoteImage, numberText } from "@/shared/ui/ApiState";
+import { Txt } from "@/shared/ui/Txt";
 import { Card } from "@/shared/ui/Card";
 import { Choices } from "@/shared/ui/Choices";
 import { Notice } from "@/shared/ui/Notice";
-import { Section } from "@/shared/ui/Section";
-import { Txt } from "@/shared/ui/Txt";
-
+import { s } from "@/shared/theme/theme";
 export function Build({
   heroId,
   matchId,
@@ -23,95 +21,98 @@ export function Build({
   slot?: number;
 }) {
   const [tab, setTab] = useState("Items");
-  const h = getHero(heroId),
-    build = buildFor(h),
-    abilities = getAbilities(heroId);
-  const player = matchId
-    ? getMatch(matchId).players.find((p) => p.player_slot === slot)
-    : undefined;
+  const hero = useHero(heroId),
+    popularity = usePopularity(heroId, tab === "Items"),
+    items = useItems(tab === "Items");
   return (
     <View style={{ gap: 12 }}>
-      <Section title={`${h.name} build`} />
-      {player && (
-        <>
-          <Notice>
-            Sample match {matchId} ? {player.name}
-          </Notice>
-          <Section title="Final inventory" />
-          <Card>
-            <View style={s.wrap}>
-              {player.items.filter(Boolean).map((key, i) => (
-                <View key={i}>
-                  <Image
-                    source={{ uri: itemImg(key!) }}
-                    style={{ width: 64, height: 44, borderRadius: 6 }}
-                  />
-                  <Txt size={9}>{getItem(key!)?.name ?? key}</Txt>
-                </View>
-              ))}
-            </View>
-          </Card>
-          <Section title="Purchase timeline" />
-          <Card>
-            {player.purchases.map((purchase, i) => (
-              <View key={i} style={s.row}>
-                <Image
-                  source={{ uri: itemImg(purchase.key) }}
-                  style={{ width: 42, height: 30, borderRadius: 5 }}
-                />
-                <View style={{ flex: 1 }}>
-                  <Txt>{getItem(purchase.key)?.name ?? purchase.key}</Txt>
-                </View>
-                <Txt color={C.gold}>{fmtDuration(purchase.time)}</Txt>
-              </View>
-            ))}
-          </Card>
-        </>
+      <Txt bold size={20}>
+        {hero.data?.data.name ?? "Hero"} build
+      </Txt>
+      {matchId && (
+        <Notice>
+          Inventory and purchase timeline for match {matchId}, slot{" "}
+          {slot ?? "—"} require the Matches API. No sample inventory is shown.
+        </Notice>
       )}
-      <Badge />
       <Choices
         items={["Items", "Skills & talents"]}
         value={tab}
         onChange={setTab}
       />
+      <ApiState
+        pending={hero.isPending}
+        error={hero.error}
+        retry={() => void hero.refetch()}
+      />
       {tab === "Items" ? (
-        Object.entries(build).map(([name, items]) => (
-          <Card key={name}>
-            <Txt bold>{name.toUpperCase()}</Txt>
-            <View style={s.wrap}>
-              {(Array.isArray(items) ? items : []).map(
-                (key: string, i: number) => (
-                  <View key={key + i} style={{ width: 86, gap: 5 }}>
-                    <Image
-                      source={{ uri: itemImg(key) }}
-                      style={{ width: 70, height: 50, borderRadius: 6 }}
-                    />
-                    <Txt size={10}>{getItem(key)?.name ?? key}</Txt>
-                    <Txt color={C.gold} size={10}>
-                      {getItem(key)?.cost ?? ""}
-                    </Txt>
-                  </View>
-                ),
-              )}
-            </View>
-          </Card>
-        ))
+        <>
+          <Notice>
+            Item counts from professional matches. Popularity does not represent
+            a recommended build or item win rate.
+          </Notice>
+          <ApiState
+            pending={popularity.isPending || items.isPending}
+            error={popularity.error ?? items.error}
+            retry={() => {
+              void popularity.refetch();
+              void items.refetch();
+            }}
+          />
+          {!items.error &&
+            popularity.data?.data.phases.map((phase) => (
+              <Card key={phase.phase}>
+                <Txt bold>{phase.phase.toUpperCase()}</Txt>
+                {phase.items.length ? (
+                  phase.items.map((row) => {
+                    const item = items.data?.data.find(
+                      (i) => i.item_id === row.item_id,
+                    );
+                    return (
+                      <View key={row.item_id} style={s.row}>
+                        <RemoteImage uri={item?.image_url ?? null} />
+                        <View style={{ flex: 1 }}>
+                          <Txt bold>{item?.name ?? "Item " + row.item_id}</Txt>
+                          <Txt muted>
+                            Cost {numberText(item?.cost)} · {row.count}{" "}
+                            purchases
+                          </Txt>
+                        </View>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <Txt muted>No item data for this phase.</Txt>
+                )}
+              </Card>
+            ))}
+        </>
       ) : (
         <>
-          <Section title="Skills" />
-          {[...abilities.abilities, abilities.ult].map((a, i) => (
-            <Card key={i}>
+          <Notice>
+            Optimal skill order is not available in API v1. Showing hero
+            abilities and talents.
+          </Notice>
+          {hero.data?.data.abilities?.map((a) => (
+            <Card key={a.key}>
               <Txt bold>{a.name}</Txt>
-              <Txt muted>{a.desc.replace(/<[^>]*>/g, "")}</Txt>
+              <Txt muted>{a.description ?? "Description unavailable"}</Txt>
             </Card>
           ))}
-          <Section title="Talent tree" />
-          {abilities.talents.map((pair, i) => (
-            <Card key={i}>
-              <Txt color={C.gold}>Level {10 + i * 5}</Txt>
-              <Txt>{pair.join("  /  ")}</Txt>
+          {hero.data && !hero.data.data.abilities && (
+            <Txt muted>Ability data unavailable.</Txt>
+          )}
+          {hero.data?.data.talents?.map((t) => (
+            <Card key={t.level}>
+              <Txt bold>Level {t.level}</Txt>
+              <Txt>
+                {t.left} / {t.right}
+              </Txt>
             </Card>
           ))}
+          {hero.data && !hero.data.data.talents && (
+            <Txt muted>Talent data unavailable.</Txt>
+          )}
         </>
       )}
     </View>

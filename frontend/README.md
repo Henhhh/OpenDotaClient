@@ -1,5 +1,13 @@
 # OpenDota Mobile
 
+## Cập nhật tích hợp phần 2
+
+Heroes, Hero detail, HeroRanks, Search và Builds đã dùng backend API phần 2.
+Các mô tả dữ liệu mẫu bên dưới chỉ còn áp dụng cho phần chưa được tích hợp.
+Xem [hướng dẫn chạy web/điện thoại, phạm vi và kiểm thử](../docs/PART2_FRONTEND.md).
+Đặt `EXPO_PUBLIC_API_BASE_URL` trong `.env.local` nếu backend không ở localhost:3000.
+Kiểm thử phần 2: `npm.cmd run test:part2`; [báo cáo và giới hạn kiểm chứng](../docs/PART2_TEST_REPORT.md).
+
 Bản web dùng chế độ SPA (`web.output: single`), phù hợp app mobile và tránh lỗi SSR incremental của Metro trong môi trường hiện tại.
 
 Frontend React Native + Expo SDK 58 + TypeScript, chuyển từ hai bản Figma Make/React web được cung cấp. Giao diện dùng component native, không nhúng website vào WebView.

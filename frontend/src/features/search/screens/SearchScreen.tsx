@@ -1,185 +1,157 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Pressable, TextInput, View } from "react-native";
-import { searchAll, TRENDING } from "@/features/search/data/search";
-import { HEROES } from "@/features/heroes/data/heroes";
-import { PLAYERS } from "@/features/players/data/players";
+import { useApi } from "@/features/heroes/api/queries";
+import type { SearchResults } from "@/shared/api/client";
+import { ApiState, RemoteImage } from "@/shared/ui/ApiState";
 import { C, s } from "@/shared/theme/theme";
-import { Art } from "@/shared/ui/Art";
-import { Badge } from "@/shared/ui/Badge";
-import { Button } from "@/shared/ui/Button";
-import { Card } from "@/shared/ui/Card";
-import { Choices } from "@/shared/ui/Choices";
-import { Empty } from "@/shared/ui/Empty";
-import { IconButton } from "@/shared/ui/IconButton";
-import { Notice } from "@/shared/ui/Notice";
-import { Section } from "@/shared/ui/Section";
 import { Txt } from "@/shared/ui/Txt";
+import { Card } from "@/shared/ui/Card";
+import { Button } from "@/shared/ui/Button";
+import { Choices } from "@/shared/ui/Choices";
+import { Notice } from "@/shared/ui/Notice";
+import { Empty } from "@/shared/ui/Empty";
 import { useAppState } from "@/shared/state/AppState";
 import { go } from "@/shared/navigation/navigation";
-
 export function Search() {
   const [q, setQ] = useState(""),
+    [debounced, setDebounced] = useState(""),
     [category, setCategory] = useState("All");
   const { state, set } = useAppState();
-  const results = searchAll(q);
-  const save = () => {
-    if (q.trim())
-      set((s) => ({
-        ...s,
-        history: [q.trim(), ...s.history.filter((x) => x !== q.trim())].slice(
-          0,
-          8,
-        ),
-      }));
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(q.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [q]);
+  const types: Record<string, string> = {
+    All: "all",
+    Players: "player",
+    Heroes: "hero",
+    Teams: "team",
+    "Match IDs": "match",
   };
-  const open = (name: string, id: number) => {
-    save();
+  const valid = [...debounced].length >= 2 && [...debounced].length <= 80;
+  const query = useApi<SearchResults>(
+    "/search",
+    { q: debounced, type: types[category], limit: 10 },
+    valid,
+  );
+  const current = debounced === q.trim();
+  const result = current && valid ? query.data?.data : undefined;
+  const open = (name: string, id: string) => {
+    set((s) => ({
+      ...s,
+      history: [q.trim(), ...s.history.filter((v) => v !== q.trim())].slice(
+        0,
+        8,
+      ),
+    }));
     go(name, { id });
   };
-  const show = (x: string) => category === "All" || category === x;
+  const empty =
+    result &&
+    !result.players.length &&
+    !result.heroes.length &&
+    !result.teams.length &&
+    !result.match;
   return (
     <View style={{ gap: 12 }}>
       <TextInput
-        autoFocus
         accessibilityLabel="Search"
-        style={[s.input, { flex: undefined }]}
-        placeholder="Search players, heroes, teams or match IDs"
-        placeholderTextColor={C.subtle}
         value={q}
         onChangeText={setQ}
-        onSubmitEditing={() => {
-          save();
-          if (results.matchId) open("match", results.matchId);
-        }}
+        placeholder="Search players, heroes, teams or match IDs"
+        placeholderTextColor={C.subtle}
+        style={[s.input, { flex: undefined }]}
       />
       <Choices
-        items={["All", "Players", "Heroes", "Teams", "Match IDs"]}
+        items={Object.keys(types)}
         value={category}
         onChange={setCategory}
       />
       {!q.trim() ? (
         <>
-          <Section
-            title="Recent searches"
-            action="Clear all"
-            onPress={() => set((s) => ({ ...s, history: [] }))}
-          />
-          <Card>
-            {state.history.length ? (
-              state.history.map((term) => (
-                <View key={term} style={s.between}>
-                  <Pressable
-                    onPress={() => setQ(term)}
-                    style={{ flex: 1, padding: 10 }}
-                  >
-                    <Txt>{term}</Txt>
-                  </Pressable>
-                  <IconButton
-                    name="close"
-                    label={`Remove ${term}`}
-                    onPress={() =>
-                      set((s) => ({
-                        ...s,
-                        history: s.history.filter((x) => x !== term),
-                      }))
-                    }
-                  />
-                </View>
-              ))
-            ) : (
-              <Txt muted>No recent searches</Txt>
-            )}
-          </Card>
-          <Section title="Trending searches" />
-          <View style={s.wrap}>
-            {TRENDING.map((term) => (
-              <Button key={term} onPress={() => setQ(term)}>
-                ↗ {term}
-              </Button>
-            ))}
+          <View style={s.between}>
+            <Txt bold>Recent searches</Txt>
+            <Button onPress={() => set((s) => ({ ...s, history: [] }))}>
+              Clear all
+            </Button>
           </View>
-          <Section title="Recent players" />
-          <View style={s.wrap}>
-            {PLAYERS.slice(0, 4).map((p) => (
-              <Pressable
-                key={p.account_id}
-                onPress={() => open("player", p.account_id)}
-                style={{ alignItems: "center", gap: 5 }}
-              >
-                <Art hero={p.avatarHero} width={56} height={56} />
-                <Txt size={11}>{p.name}</Txt>
-              </Pressable>
-            ))}
-          </View>
-          <Section title="Popular heroes" />
-          <View style={s.wrap}>
-            {HEROES.slice(0, 6).map((h) => (
-              <Button key={h.id} onPress={() => open("hero", h.id)}>
-                {h.name}
-              </Button>
-            ))}
-          </View>
-          <Notice>
-            Paste a numeric match ID to open match details. Search currently
-            uses bundled sample profiles.
-          </Notice>
+          {state.history.map((term) => (
+            <Button key={term} onPress={() => setQ(term)}>
+              {term}
+            </Button>
+          ))}
         </>
       ) : (
         <>
-          <Badge />
-          {show("Match IDs") && results.matchId && (
-            <Button primary onPress={() => open("match", results.matchId!)}>
-              Open match {results.matchId}
-            </Button>
+          {(!valid || !current) && (
+            <Txt muted>
+              {[...q.trim()].length < 2
+                ? "Enter at least 2 characters."
+                : [...q.trim()].length > 80
+                  ? "Use at most 80 characters."
+                  : "Searching…"}
+            </Txt>
           )}
-          {show("Players") &&
-            results.players.map((p) => (
-              <Pressable
-                key={p.account_id}
-                onPress={() => open("player", p.account_id)}
-              >
-                <Card>
-                  <View style={s.row}>
-                    <Art hero={p.avatarHero} />
-                    <Txt bold>{p.name}</Txt>
-                  </View>
-                </Card>
-              </Pressable>
-            ))}
-          {show("Heroes") &&
-            results.heroes.map((h) => (
-              <Pressable key={h.id} onPress={() => open("hero", h.id)}>
-                <Card>
-                  <View style={s.row}>
-                    <Art hero={h.key} />
-                    <Txt bold>{h.name}</Txt>
-                  </View>
-                </Card>
-              </Pressable>
-            ))}
-          {show("Teams") &&
-            results.teams.map((t) => (
-              <Button key={t.team_id} onPress={() => open("team", t.team_id)}>
-                {t.name}
-              </Button>
-            ))}
-          {show("Teams") &&
-            results.leagues.map((l) => (
+          {current && valid && (
+            <ApiState
+              pending={query.isPending}
+              error={query.error}
+              retry={() => void query.refetch()}
+            />
+          )}
+          {result?.match && (
+            <>
               <Button
-                key={l.leagueid}
-                onPress={() => open("league", l.leagueid)}
+                primary
+                onPress={() => open("match", result.match!.match_id)}
               >
-                {l.name}
+                Open match {result.match.match_id}
               </Button>
-            ))}
-          {!(
-            (show("Players") && results.players.length) ||
-            (show("Heroes") && results.heroes.length) ||
-            (show("Teams") && results.teams.length + results.leagues.length) ||
-            (show("Match IDs") && results.matchId)
-          ) && <Empty />}
+              <Txt muted>
+                Match ID suggestion only; existence has not been verified.
+              </Txt>
+            </>
+          )}
+          {result?.heroes.map((h) => (
+            <Pressable key={h.hero_id} onPress={() => open("hero", h.hero_id)}>
+              <Card>
+                <View style={s.row}>
+                  <RemoteImage uri={h.image_url} />
+                  <Txt bold>{h.name}</Txt>
+                </View>
+              </Card>
+            </Pressable>
+          ))}
+          {result?.players.map((p) => (
+            <Pressable
+              key={p.account_id}
+              onPress={() => open("player", p.account_id)}
+            >
+              <Card>
+                <View style={s.row}>
+                  <RemoteImage uri={p.avatar_url} />
+                  <Txt bold>{p.name ?? p.account_id}</Txt>
+                </View>
+              </Card>
+            </Pressable>
+          ))}
+          {result?.teams.map((t) => (
+            <Pressable key={t.team_id} onPress={() => open("team", t.team_id)}>
+              <Card>
+                <View style={s.row}>
+                  <RemoteImage uri={t.logo_url} />
+                  <Txt bold>{t.name}</Txt>
+                </View>
+              </Card>
+            </Pressable>
+          ))}
+          {empty && <Empty text="No results found" />}
         </>
       )}
+      <Notice>
+        Search uses OpenDota data. Player, team and match detail screens still
+        use sample data until their APIs are integrated.
+      </Notice>
     </View>
   );
 }
