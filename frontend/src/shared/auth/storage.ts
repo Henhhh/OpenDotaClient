@@ -4,8 +4,3 @@ export const writeToken = (value: string | null) =>
   value
     ? SecureStore.setItemAsync("opendota.session", value)
     : SecureStore.deleteItemAsync("opendota.session");
-export const readFlow = () => SecureStore.getItemAsync("opendota.login");
-export const writeFlow = (value: string | null) =>
-  value
-    ? SecureStore.setItemAsync("opendota.login", value)
-    : SecureStore.deleteItemAsync("opendota.login");

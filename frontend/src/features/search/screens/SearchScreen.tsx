@@ -149,8 +149,8 @@ export function Search() {
         </>
       )}
       <Notice>
-        Search uses OpenDota data. Player, team and match detail screens still
-        use sample data until their APIs are integrated.
+        Search and detail screens use backend API data. Private or unavailable
+        profiles may not provide match statistics.
       </Notice>
     </View>
   );

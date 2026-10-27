@@ -1,3 +1,5 @@
+> Cập nhật 28/10/2026: Steam đã được thay bằng form email/password. Auth hiện hành và migration xem [AUTH.md](AUTH.md); các mục Steam bên dưới chỉ ghi lại mốc kiểm thử cũ.
+
 # Người 3 — Backend API và chức năng
 
 Triển khai theo [API_CONTRACT.md](API_CONTRACT.md), wire DTO giữ nguyên trong `shared/api-contract.ts`.

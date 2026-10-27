@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { OpenDotaClient, TeamSearchService, SearchResults } from '../../../../shared/api-contract.ts';
 import { HeroesService, playerDto } from '../heroes/service.ts';
 import { playerSchema } from '../heroes/schemas.ts';
-import { ApiError, endpoint, query, text, searchLimit, compareId, numericId } from '../part2/http.ts';
+import { ApiError, endpoint, query, text, searchLimit, compareId, numericId } from '../../core/http.ts';
 export function createRouter(deps: { client: OpenDotaClient; teams?: TeamSearchService }) {
   const router = Router();
   const service = new HeroesService(deps.client);

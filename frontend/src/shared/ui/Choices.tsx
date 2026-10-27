@@ -7,11 +7,13 @@ export function Choices({
   value,
   onChange,
   segmented = false,
+  label = (v: string) => v,
 }: {
   items: readonly string[];
   value: string;
   onChange: (v: string) => void;
   segmented?: boolean;
+  label?: (v: string) => string;
 }) {
   return (
     <ScrollView
@@ -44,7 +46,7 @@ export function Choices({
           }}
         >
           <Txt size={11} bold color={value === x ? C.text : C.muted}>
-            {x}
+            {label(x)}
           </Txt>
         </Pressable>
       ))}

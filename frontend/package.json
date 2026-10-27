@@ -21,7 +21,6 @@
     "expo-status-bar": "~58.0.4",
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.6",
-    "expo-web-browser": "~58.0.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
@@ -52,6 +51,7 @@
     "format": "prettier --write src",
     "test:e2e": "playwright test",
     "test:part2": "playwright test tests/part2.spec.ts",
+    "test:part1": "playwright test tests/part1.spec.mts",
     "test:part3": "playwright test tests/part3.spec.mts"
   },
   "private": true

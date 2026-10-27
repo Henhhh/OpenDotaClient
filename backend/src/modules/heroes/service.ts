@@ -1,8 +1,8 @@
 import type { z } from 'zod';
 import type { Hero, HeroDetail, HeroStats, HeroMatchup, Item, ItemPopularity, HeroRanking, OpenDotaClient, PlayerSummary } from '../../../../shared/api-contract.ts';
 import { UpstreamError } from '../../integrations/opendota/errors.ts';
-import { ApiError, compareId } from '../part2/http.ts';
-import type { Context, ServiceResult } from '../part2/http.ts';
+import { ApiError, compareId } from '../../core/http.ts';
+import type { Context, ServiceResult } from '../../core/http.ts';
 import * as schemas from './schemas.ts';
 
 export function image(path: string | null | undefined): string | null {

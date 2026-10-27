@@ -1,94 +1,124 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View, Switch } from "react-native";
-import { getHero } from "@/features/heroes/data/heroes";
-import { playerMatches, isWin } from "@/features/matches/data/matches";
-import { ME_ID } from "@/features/players/data/players";
-import { fmtPct, kdaRatio } from "@/shared/utils/format";
+import { TextInput, View } from "react-native";
+import type { PlayerMatch, PlayerHero, Page } from "@/shared/api/client";
 import {
-  applyMatchFilters,
-  DEFAULT,
-  dayLabel,
-  type Filters,
-} from "@/features/matches/logic/matchFilters";
-import { C, s } from "@/shared/theme/theme";
-import { Art } from "@/shared/ui/Art";
-import { Badge } from "@/shared/ui/Badge";
+  usePlayerApi,
+  usePlayerPages,
+  validId,
+  validAccount,
+} from "@/features/players/api/queries";
+import {
+  AccountPicker,
+  useViewedAccount,
+} from "@/features/players/components/AccountPicker";
+import { ApiState } from "@/shared/ui/ApiState";
 import { Button } from "@/shared/ui/Button";
-import { Card } from "@/shared/ui/Card";
 import { Choices } from "@/shared/ui/Choices";
-import { Empty } from "@/shared/ui/Empty";
 import { Sheet } from "@/shared/ui/Sheet";
-import { SortMenu } from "@/shared/ui/SortMenu";
+import { Notice } from "@/shared/ui/Notice";
 import { Txt } from "@/shared/ui/Txt";
+import { C, s } from "@/shared/theme/theme";
 import { go } from "@/shared/navigation/navigation";
-import { MatchRow } from "@/features/matches/components/MatchRow";
-
+import { heroPresentation } from "@/features/heroes/data/presentation";
+import { MatchRow } from "../components/MatchRow";
+type Filters = { result: string; range: string; hero: string };
+const defaults: Filters = { result: "All", range: "All", hero: "Any hero" };
 export function Matches({
-  accountId = ME_ID,
+  accountId,
   filterOpen = false,
   onFilterClose = () => {},
 }: {
-  accountId?: number;
+  accountId?: string;
   filterOpen?: boolean;
   onFilterClose?: () => void;
 }) {
-  const [filters, setFilters] = useState<Filters>(DEFAULT),
-    [draft, setDraft] = useState<Filters>(DEFAULT),
-    [open, setOpen] = useState(false),
-    [sort, setSort] = useState("Most recent"),
-    [count, setCount] = useState(15),
+  const selected = useViewedAccount(),
+    id = accountId ?? selected;
+  return (
+    <View style={{ gap: 12 }}>
+      {!accountId && <AccountPicker />}
+      <MatchHistory
+        key={id}
+        id={id}
+        filterOpen={filterOpen}
+        onFilterClose={onFilterClose}
+      />
+    </View>
+  );
+}
+function MatchHistory({
+  id,
+  filterOpen,
+  onFilterClose,
+}: {
+  id: string;
+  filterOpen: boolean;
+  onFilterClose: () => void;
+}) {
+  const [mode, setMode] = useState("All modes"),
+    [filters, setFilters] = useState(defaults),
+    [draft, setDraft] = useState(defaults);
+  const [open, setOpen] = useState(false),
     [lookup, setLookup] = useState(""),
     [error, setError] = useState("");
-  const [lastExternalOpen, setLastExternalOpen] = useState(filterOpen);
-  if (lastExternalOpen !== filterOpen) {
-    setLastExternalOpen(filterOpen);
+  const [previous, setPrevious] = useState(filterOpen);
+  if (previous !== filterOpen) {
+    setPrevious(filterOpen);
     if (filterOpen) setDraft(filters);
   }
-  const all = playerMatches(accountId),
-    rows = applyMatchFilters(all, filters).sort((a, b) =>
-      sort === "Best KDA"
-        ? kdaRatio(b.kills, b.deaths, b.assists) -
-          kdaRatio(a.kills, a.deaths, a.assists)
-        : sort === "Highest GPM"
-          ? b.gold_per_min - a.gold_per_min
-          : sort === "Longest duration"
-            ? b.duration - a.duration
-            : b.start_time - a.start_time,
-    );
-  const wins = rows.filter(isWin).length;
-  const update = (patch: Partial<Filters>) => {
-    setFilters((f) => ({ ...f, ...patch }));
-    setCount(15);
+  const [anchor] = useState(() => Math.floor(Date.now() / 1000));
+  const params = {
+    result:
+      filters.result === "Wins"
+        ? "win"
+        : filters.result === "Losses"
+          ? "loss"
+          : undefined,
+    from:
+      filters.range === "All"
+        ? undefined
+        : anchor - Number(filters.range.split(" ")[0]) * 86400,
+    hero_id: filters.hero === "Any hero" ? undefined : filters.hero,
+    lobby_type: mode === "Ranked" ? 7 : mode === "Unranked" ? 0 : undefined,
+    game_mode: mode === "Turbo" ? 23 : undefined,
   };
+  const q = usePlayerPages<PlayerMatch>(
+    `/players/${id}/matches`,
+    params,
+    validAccount(id),
+  );
+  const heroes = usePlayerApi<Page<PlayerHero>>(
+    `/players/${id}/heroes`,
+    { limit: 100 },
+    validAccount(id),
+  );
+  const rows = q.data?.pages.flatMap((p) => p.data.items) ?? [];
+  const total = q.data?.pages[0].data.total;
   const close = () => {
     setOpen(false);
     onFilterClose();
   };
-  const visible = open || filterOpen;
   return (
     <View style={{ gap: 10 }}>
       <View style={s.row}>
         <TextInput
           accessibilityLabel="Match ID"
-          placeholder="#  Look up a match ID"
-          placeholderTextColor={C.subtle}
-          keyboardType="number-pad"
           value={lookup}
           onChangeText={setLookup}
+          placeholder="# Look up a match ID"
+          placeholderTextColor={C.subtle}
+          keyboardType="number-pad"
           style={s.input}
         />
         <Button
           onPress={() => {
-            if (
-              !/^\d+$/.test(lookup) ||
-              !Number.isSafeInteger(Number(lookup)) ||
-              Number(lookup) <= 0
-            ) {
+            const value = lookup.trim();
+            if (!validId(value)) {
               setError("Enter a valid numeric match ID.");
               return;
             }
             setError("");
-            go("match", { id: lookup });
+            go("match", { id: value });
           }}
         >
           Open
@@ -97,26 +127,8 @@ export function Matches({
       {!!error && <Txt color={C.loss}>{error}</Txt>}
       <Choices
         items={["All modes", "Ranked", "Unranked", "Turbo"]}
-        value={
-          {
-            all: "All modes",
-            ranked: "Ranked",
-            unranked: "Unranked",
-            turbo: "Turbo",
-          }[filters.mode]
-        }
-        onChange={(v) =>
-          update({
-            mode: (
-              {
-                "All modes": "all",
-                Ranked: "ranked",
-                Unranked: "unranked",
-                Turbo: "turbo",
-              } as const
-            )[v as "Ranked"],
-          })
-        }
+        value={mode}
+        onChange={setMode}
       />
       <View style={s.between}>
         <Button
@@ -127,152 +139,85 @@ export function Matches({
         >
           ☷ Filters
         </Button>
-        <SortMenu
-          items={["Most recent", "Best KDA", "Highest GPM", "Longest duration"]}
-          value={sort}
-          onChange={setSort}
-        />
+        <Txt muted>Most recent</Txt>
       </View>
-      <Card>
-        <View style={s.between}>
-          <View>
-            <Txt bold color={C.win}>
-              {wins}W{" "}
-              <Text style={{ color: C.loss }}>– {rows.length - wins}L</Text>
-            </Txt>
-            <Txt muted>{rows.length} matches shown</Txt>
-          </View>
-          <Txt bold>
-            {fmtPct(wins / Math.max(1, rows.length))}{" "}
-            {rows.length
-              ? (
-                  rows.reduce(
-                    (a, m) => a + kdaRatio(m.kills, m.deaths, m.assists),
-                    0,
-                  ) / rows.length
-                ).toFixed(2)
-              : "0.00"}
-          </Txt>
-        </View>
-      </Card>
-      <Badge />
-      {!rows.length && <Empty />}
-      {rows.slice(0, count).map((m, i) => (
-        <View key={m.match_id}>
-          {(i === 0 ||
-            dayLabel(m.start_time) !== dayLabel(rows[i - 1].start_time)) && (
-            <Text style={[s.label, { color: C.subtle, marginVertical: 12 }]}>
-              {dayLabel(m.start_time).toUpperCase()}
-            </Text>
-          )}
-          <MatchRow m={m} />
-        </View>
+      <ApiState
+        pending={q.isPending}
+        error={q.error}
+        retry={() => void q.refetch()}
+      />
+      {q.data && (
+        <Txt muted>
+          {total ?? rows.length} matches · {rows.length} loaded
+        </Txt>
+      )}
+      {q.data && !rows.length && !q.error && (
+        <Txt muted>No matches match these filters.</Txt>
+      )}
+      {rows.map((m) => (
+        <MatchRow key={m.match_id} m={m} />
       ))}
-      {count < rows.length && (
-        <Button onPress={() => setCount((c) => c + 15)}>
-          Load more ({rows.length - count} remaining)
+      {q.hasNextPage && (
+        <Button
+          onPress={() => {
+            if (!q.isFetchingNextPage) void q.fetchNextPage();
+          }}
+        >
+          {q.isFetchingNextPage ? "Loading…" : "Load more matches"}
         </Button>
       )}
       <Sheet
-        visible={visible}
+        visible={open || filterOpen}
         onClose={close}
         title="Filter matches"
         footer={
           <View style={s.row}>
-            <View style={{ flex: 1 }}>
-              <Button onPress={() => setDraft(DEFAULT)}>Reset</Button>
-            </View>
-            <View style={{ flex: 2 }}>
-              <Button
-                primary
-                onPress={() => {
-                  setFilters(draft);
-                  setCount(15);
-                  close();
-                }}
-              >
-                Show {applyMatchFilters(all, draft).length} matches
-              </Button>
-            </View>
+            <Button onPress={() => setDraft(defaults)}>Reset</Button>
+            <Button
+              primary
+              onPress={() => {
+                setFilters(draft);
+                close();
+              }}
+            >
+              Apply filters
+            </Button>
           </View>
         }
       >
-        <Txt muted>Filter match history</Txt>
-        <Text style={s.label}>RESULT</Text>
+        <Txt muted>RESULT</Txt>
         <Choices
           segmented
           items={["All", "Wins", "Losses"]}
-          value={{ all: "All", win: "Wins", loss: "Losses" }[draft.result]}
-          onChange={(v) =>
-            setDraft((d) => ({
-              ...d,
-              result: v === "Wins" ? "win" : v === "Losses" ? "loss" : "all",
-            }))
-          }
+          value={draft.result}
+          onChange={(result) => setDraft((d) => ({ ...d, result }))}
         />
-        <Text style={s.label}>DATE RANGE</Text>
+        <Txt muted>DATE RANGE</Txt>
         <Choices
           segmented
           items={["All", "30 days", "7 days"]}
-          value={draft.range === "all" ? "All" : draft.range + " days"}
-          onChange={(v) =>
-            setDraft((d) => ({
-              ...d,
-              range: v === "All" ? "all" : v === "30 days" ? "30" : "7",
-            }))
-          }
+          value={draft.range}
+          onChange={(range) => setDraft((d) => ({ ...d, range }))}
         />
-        <Text style={s.label}>HERO</Text>
-        <View style={s.wrap}>
-          {[null, ...new Set(all.map((m) => m.hero_id))].map((id) => (
-            <Pressable
-              key={id ?? "any"}
-              onPress={() => setDraft((d) => ({ ...d, hero: id }))}
-              style={[
-                s.row,
-                {
-                  backgroundColor: draft.hero === id ? "#40252a" : C.raised,
-                  padding: 10,
-                  borderRadius: 22,
-                },
-              ]}
-            >
-              {id && <Art hero={getHero(id).key} width={22} height={22} />}
-              <Txt size={11}>{id ? getHero(id).name : "Any hero"}</Txt>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={s.label}>LANE</Text>
+        <Txt muted>HERO</Txt>
         <Choices
-          items={["Any", "Safe lane", "Mid lane", "Off lane"]}
-          value={["Any", "Safe lane", "Mid lane", "Off lane"][draft.lane ?? 0]}
-          onChange={(v) =>
-            setDraft((d) => ({
-              ...d,
-              lane:
-                ["Any", "Safe lane", "Mid lane", "Off lane"].indexOf(v) || null,
-            }))
-          }
+          items={[
+            "Any hero",
+            ...(heroes.data?.data.items ?? []).map((h) => h.hero_id),
+          ]}
+          value={draft.hero}
+          label={(v) => (v === "Any hero" ? v : heroPresentation(v).name)}
+          onChange={(hero) => setDraft((d) => ({ ...d, hero }))}
         />
-        <Text style={s.label}>PARTY</Text>
-        <Choices
-          segmented
-          items={["Any", "Solo", "Party"]}
-          value={draft.party[0].toUpperCase() + draft.party.slice(1)}
-          onChange={(v) =>
-            setDraft((d) => ({
-              ...d,
-              party: v.toLowerCase() as Filters["party"],
-            }))
-          }
+        <ApiState
+          pending={heroes.isPending}
+          error={heroes.error}
+          retry={() => void heroes.refetch()}
         />
-        <View style={s.between}>
-          <Txt bold>Parsed matches only</Txt>
-          <Switch
-            value={draft.parsedOnly}
-            onValueChange={(v) => setDraft((d) => ({ ...d, parsedOnly: v }))}
-          />
-        </View>
+        <Notice>
+          Lane, party, parsed-only filters and alternate sorting are not
+          available in API v1. Unranked selects lobby type 0.
+        </Notice>
       </Sheet>
     </View>
   );

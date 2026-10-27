@@ -33,7 +33,11 @@ export async function apiRequest<T>(
   signal?.addEventListener("abort", abort, { once: true });
   const timer = setTimeout(abort, 25000);
   try {
-    const privateRequest = path.startsWith("/me/") || path.startsWith("/auth/");
+    const privateRequest =
+      path.startsWith("/me/") ||
+      path.startsWith("/auth/") ||
+      path.startsWith("/parse-jobs/") ||
+      (method === "POST" && /^\/matches\/[^/]+\/parse$/.test(path));
     const token = privateRequest ? await readToken() : null;
     const response = await fetch(
       `${apiBaseUrl}${path}${query ? `?${query}` : ""}`,

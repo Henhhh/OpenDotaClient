@@ -1,79 +1,72 @@
 import express from "express";
-import { randomUUID } from "node:crypto";
-import type { ErrorRequestHandler } from "express";
 import type { OpenDotaClient } from "../../shared/api-contract.ts";
 import type { AuthConfig } from "./modules/auth/service.ts";
-import type { createSteamVerifier } from "./modules/auth/steam.ts";
 import { createPart3Foundation } from "./part3-foundation.ts";
 import { createRouter as heroes } from "./modules/heroes/index.ts";
 import { createRouter as constants } from "./modules/constants/index.ts";
 import { createRouter as search } from "./modules/search/index.ts";
+import { ApiError, errorHandler } from "./core/http.ts";
 import {
-  ApiError,
-  errorHandler,
-  endpoint,
-  query,
-} from "./modules/part2/http.ts";
-import { z } from "zod";
+  requestContext,
+  cors,
+  jsonBody,
+  ensureDeadline,
+  notFound,
+} from "./core/middleware.ts";
+import { createHealthRouter } from "./core/health.ts";
+import { createRouter as players } from "./modules/players/index.ts";
+import { createRouter as matchesRouter } from "./modules/matches/index.ts";
+import { createRouter as parseJobsRouter } from "./modules/parse-jobs/index.ts";
+import { MatchesService } from "./modules/matches/service.ts";
+import { ParseService } from "./modules/matches/parse-service.ts";
 
-/** Integration host for existing modules. Person 1 can mount Players/Matches here later. */
+/** One integration host for Players/Matches, Heroes/Search, Pro and account modules. */
 export function createApp(options: {
   client: OpenDotaClient;
   databasePath: string;
   allowedWebOrigins: readonly string[];
   auth?: AuthConfig;
-  verifySteam?: ReturnType<typeof createSteamVerifier>;
   enableRankings?: boolean;
+  enableMatchParse?: boolean;
 }) {
   const foundation = createPart3Foundation(options),
     app = express();
   app.disable("x-powered-by");
   const origins = new Set(options.allowedWebOrigins);
+  app.use(requestContext(), cors(origins));
   app.use((req, res, next) => {
-    res.locals.request_id = randomUUID();
-    res.locals.deadline_ms = Date.now() + 20000;
     if (
       req.method === "POST" &&
       req.path.replace(/\/$/, "") === "/api/v1/me/notifications/read-all"
     )
       res.locals.notification_boundary = foundation.me.notificationBoundary();
-    res.setHeader("X-Request-Id", res.locals.request_id);
-    const origin = req.headers.origin;
-    if (origin && origins.has(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.vary("Origin");
-      res.setHeader(
-        "Access-Control-Allow-Methods",
-        "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-      );
-      res.setHeader(
-        "Access-Control-Allow-Headers",
-        "Content-Type,Authorization",
-      );
-      res.setHeader(
-        "Access-Control-Expose-Headers",
-        "X-Request-Id,Retry-After",
-      );
-    }
-    if (req.method === "OPTIONS") {
-      res.status(origin && !origins.has(origin) ? 403 : 204).end();
-      return;
-    }
     next();
   });
-  app.use(express.json({ limit: "32kb", strict: true }));
-  app.get(
-    "/api/v1/health",
-    endpoint(async (req) => {
-      query(req, z.object({}).strict());
-      return {
-        data: { status: "ok" as const, version: "v1" as const },
-        source: "aggregate",
-        fetched_at: new Date().toISOString(),
-      };
-    }),
+  app.use(jsonBody, ensureDeadline);
+  app.use("/api/v1", createHealthRouter());
+  const matches = new MatchesService(options.client);
+  const parse = new ParseService(
+    options.client,
+    foundation.parseJobs,
+    matches,
+    (job, userId) => {
+      foundation.me.notify(userId, `parse:${job.job_id}:completed`, {
+        kind: "match",
+        title: "Match analysis ready",
+        body: `Match ${job.match_id} has been parsed.`,
+        target: { kind: "match", entity_id: job.match_id },
+      });
+    },
   );
+  const parseDeps = {
+    matches,
+    parse,
+    requireSession: foundation.requireSession,
+    enableParse: options.enableMatchParse === true && !!foundation.authRouter,
+  };
+  app.use("/api/v1/players", players(options));
+  app.use("/api/v1/matches", matchesRouter(parseDeps));
+  app.use("/api/v1/parse-jobs", parseJobsRouter(parseDeps));
   app.use("/api/v1/heroes", heroes(options));
   app.use("/api/v1/constants", constants(options));
   app.use("/api/v1/search", search({ ...options, teams: foundation.teams }));
@@ -91,15 +84,7 @@ export function createApp(options: {
         ),
       ),
     );
-  app.use((_req, _res, next) =>
-    next(new ApiError(404, "NOT_FOUND", "Route not found")),
-  );
-  const parserErrors: ErrorRequestHandler = (err, _req, _res, next) => {
-    if (err?.type === "entity.parse.failed" || err?.type === "entity.too.large")
-      next(new ApiError(400, "VALIDATION_ERROR", "Invalid JSON body"));
-    else next(err);
-  };
-  app.use(parserErrors);
+  app.use(notFound);
   app.use(errorHandler);
   return { app, foundation, close: foundation.close };
 }

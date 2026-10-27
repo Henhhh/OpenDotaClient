@@ -11,16 +11,25 @@ import { Card } from "@/shared/ui/Card";
 import { Choices } from "@/shared/ui/Choices";
 import { Notice } from "@/shared/ui/Notice";
 import { s } from "@/shared/theme/theme";
+import { usePlayerApi, validId } from "@/features/players/api/queries";
+import type { MatchDetail } from "@/shared/api/client";
+import { MatchInventory } from "@/features/matches/components/MatchInventory";
 export function Build({
   heroId,
   matchId,
   slot,
 }: {
   heroId: number;
-  matchId?: number;
+  matchId?: string;
   slot?: number;
 }) {
   const [tab, setTab] = useState("Items");
+  const match = usePlayerApi<MatchDetail>(
+    `/matches/${matchId}`,
+    {},
+    !!matchId && validId(matchId),
+  );
+  const player = match.data?.data.players.find((p) => p.player_slot === slot);
   const hero = useHero(heroId),
     popularity = usePopularity(heroId, tab === "Items"),
     items = useItems(tab === "Items");
@@ -30,10 +39,21 @@ export function Build({
         {hero.data?.data.name ?? "Hero"} build
       </Txt>
       {matchId && (
-        <Notice>
-          Inventory and purchase timeline for match {matchId}, slot{" "}
-          {slot ?? "—"} require the Matches API. No sample inventory is shown.
-        </Notice>
+        <>
+          <Txt muted>
+            Match {matchId} · slot {slot ?? "—"}
+          </Txt>
+          <ApiState
+            pending={match.isPending && match.fetchStatus !== "idle"}
+            error={match.error}
+            retry={() => void match.refetch()}
+          />
+          {player ? (
+            <MatchInventory player={player} />
+          ) : match.data ? (
+            <Notice>Player slot not found in this match.</Notice>
+          ) : null}
+        </>
       )}
       <Choices
         items={["Items", "Skills & talents"]}

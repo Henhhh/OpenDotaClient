@@ -8,8 +8,8 @@ import type {
   MatchSummary,
   Page,
 } from "../../../../shared/api-contract.ts";
-import { ApiError, compareId, page } from "../part2/http.ts";
-import type { Context, ServiceResult } from "../part2/http.ts";
+import { ApiError, compareId, page } from "../../core/http.ts";
+import type { Context, ServiceResult } from "../../core/http.ts";
 import { image } from "../heroes/service.ts";
 import { UpstreamError } from "../../integrations/opendota/errors.ts";
 

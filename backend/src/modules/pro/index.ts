@@ -10,7 +10,7 @@ import {
   text,
   page,
   compareId,
-} from "../part2/http.ts";
+} from "../../core/http.ts";
 import { ProService } from "./service.ts";
 const empty = z.object({}).strict();
 const list = z.object(pagination).strict();

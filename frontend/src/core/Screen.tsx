@@ -7,8 +7,7 @@ import {
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useQuery, useQueryClient, useIsFetching } from "@tanstack/react-query";
-import { loadCatalog } from "@/core/catalog";
+import { useQueryClient, useIsFetching } from "@tanstack/react-query";
 import { Home } from "@/features/home/screens/HomeScreen";
 import { Matches } from "@/features/matches/screens/MatchesScreen";
 import { MatchDetail } from "@/features/matches/screens/MatchDetailScreen";
@@ -27,7 +26,6 @@ import { Notifications } from "@/features/notifications/screens/NotificationsScr
 import { Favorites } from "@/features/favorites/screens/FavoritesScreen";
 import { Compare } from "@/features/players/screens/CompareScreen";
 import { Settings } from "@/features/settings/screens/SettingsScreen";
-import { Button } from "@/shared/ui/Button";
 import { Empty } from "@/shared/ui/Empty";
 import { IconButton } from "@/shared/ui/IconButton";
 import { Txt } from "@/shared/ui/Txt";
@@ -60,6 +58,12 @@ const TITLES: Record<string, string> = {
 export function Screen({ name }: { name: string }) {
   const queryClient = useQueryClient();
   const liveScreen = [
+    "home",
+    "profile",
+    "player",
+    "matches",
+    "match",
+    "compare",
     "heroes",
     "hero",
     "heroRanks",
@@ -77,7 +81,9 @@ export function Screen({ name }: { name: string }) {
   const part2Fetching = useIsFetching({ queryKey: ["part2"] });
   const part3Fetching = useIsFetching({ queryKey: ["part3"] });
   const accountFetching = useIsFetching({ queryKey: ["account"] });
-  const liveFetching = part2Fetching + part3Fetching + accountFetching;
+  const part1Fetching = useIsFetching({ queryKey: ["part1"] });
+  const liveFetching =
+    part1Fetching + part2Fetching + part3Fetching + accountFetching;
   const [grid, setGrid] = useState(true);
   const params = useLocalSearchParams<{
     id?: string;
@@ -89,11 +95,6 @@ export function Screen({ name }: { name: string }) {
     [filter, setFilter] = useState(false),
     [refreshed, setRefreshed] = useState(false);
   const notifications = useUnread();
-  const query = useQuery({
-    queryKey: ["catalog"],
-    queryFn: loadCatalog,
-    staleTime: 60_000,
-  });
   const refresh = () => {
     const accountRefresh = Promise.all([
       queryClient.invalidateQueries({ queryKey: ["part3"] }),
@@ -101,14 +102,13 @@ export function Screen({ name }: { name: string }) {
     ]);
     if (liveScreen) {
       void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["part1"] }),
         accountRefresh,
         queryClient.invalidateQueries({ queryKey: ["part2"] }),
       ]).then(() => setRefreshed(true));
       return;
     }
-    void Promise.all([query.refetch(), accountRefresh]).then(() =>
-      setRefreshed(true),
-    );
+    void accountRefresh.then(() => setRefreshed(true));
   };
   const root = ["home", "matches", "heroes", "pro", "profile"].includes(name);
   const unread = notifications.error
@@ -131,20 +131,24 @@ export function Screen({ name }: { name: string }) {
       content = <Pro />;
       break;
     case "profile":
-      content = <Profile refreshing={query.isFetching} onRefresh={refresh} />;
+      content = <Profile refreshing={part1Fetching > 0} onRefresh={refresh} />;
       break;
     case "player":
       content = (
-        <Profile id={id} refreshing={query.isFetching} onRefresh={refresh} />
+        <Profile
+          key={params.id}
+          id={params.id ?? ""}
+          refreshing={part1Fetching > 0}
+          onRefresh={refresh}
+        />
       );
       break;
     case "match":
-      content =
-        Number.isSafeInteger(id) && id > 0 ? (
-          <MatchDetail id={id} />
-        ) : (
-          <Empty text="Invalid match ID" />
-        );
+      content = /^[1-9]\d{0,19}$/.test(params.id ?? "") ? (
+        <MatchDetail key={params.id} id={params.id!} />
+      ) : (
+        <Empty text="Invalid match ID" />
+      );
       break;
     case "hero":
       content = <HeroDetail id={id} />;
@@ -156,7 +160,7 @@ export function Screen({ name }: { name: string }) {
       content = (
         <Build
           heroId={Number(params.heroId) || 17}
-          matchId={params.matchId ? Number(params.matchId) : undefined}
+          matchId={params.matchId}
           slot={params.slot ? Number(params.slot) : undefined}
         />
       );
@@ -192,7 +196,7 @@ export function Screen({ name }: { name: string }) {
       content = <Empty text="Screen not found" />;
   }
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <View testID={`screen-${name}`} style={{ flex: 1, backgroundColor: C.bg }}>
       <View
         style={[
           s.between,
@@ -223,7 +227,7 @@ export function Screen({ name }: { name: string }) {
           )}
           {name === "matches" && (
             <Txt muted size={10}>
-              Kaito · 48 recent matches
+              Player match history
             </Txt>
           )}
           {name === "heroes" && (
@@ -239,7 +243,7 @@ export function Screen({ name }: { name: string }) {
         </View>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           {(name === "home" || name === "profile") &&
-            (query.isFetching ? (
+            (part1Fetching > 0 ? (
               <ActivityIndicator color={C.gold} />
             ) : (
               <IconButton
@@ -311,14 +315,7 @@ export function Screen({ name }: { name: string }) {
           )}
         </View>
       </View>
-      {query.isError ? (
-        <View style={{ padding: 24 }}>
-          <Txt>Could not load data.</Txt>
-          <Button onPress={refresh}>Retry</Button>
-        </View>
-      ) : query.isPending ? (
-        <ActivityIndicator color={C.red} style={{ marginTop: 40 }} />
-      ) : name === "profile" || name === "player" ? (
+      {name === "profile" || name === "player" ? (
         content
       ) : (
         <ScrollView
@@ -326,7 +323,7 @@ export function Screen({ name }: { name: string }) {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={liveScreen ? liveFetching > 0 : query.isFetching}
+              refreshing={liveFetching > 0}
               onRefresh={refresh}
               tintColor={C.red}
             />
@@ -335,8 +332,7 @@ export function Screen({ name }: { name: string }) {
         >
           {refreshed && (
             <Txt muted size={10}>
-              {liveScreen ? "API data refreshed" : "Sample data refreshed"} ·{" "}
-              {new Date(query.data.refreshedAt).toLocaleTimeString()}
+              API data refreshed
             </Txt>
           )}
           {content}

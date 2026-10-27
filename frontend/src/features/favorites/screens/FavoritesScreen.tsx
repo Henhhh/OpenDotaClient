@@ -79,8 +79,9 @@ export function Favorites() {
       {auth.session ? (
         <>
           <Notice>
-            Favorites saved to Steam account {auth.session.user.account_id}.
-            Local favorites are kept separately.
+            Favorites saved to{" "}
+            {auth.session.user.email ?? auth.session.user.name}. Local favorites
+            are kept separately.
           </Notice>
           <Button
             onPress={() => {

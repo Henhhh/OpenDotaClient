@@ -1,43 +1,37 @@
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
-import { getDashboardData } from "@/features/home/logic/dashboardData";
-import { getHero, heroStats } from "@/features/heroes/data/heroes";
-import { Art } from "@/shared/ui/Art";
-import { Badge } from "@/shared/ui/Badge";
-import { Button } from "@/shared/ui/Button";
-import { Card } from "@/shared/ui/Card";
-import { Icon } from "@/shared/ui/Icon";
-import { Ring } from "@/shared/ui/Ring";
-import { Section } from "@/shared/ui/Section";
-import { Spark } from "@/shared/ui/Spark";
-import { Txt } from "@/shared/ui/Txt";
-import { C, s } from "@/shared/theme/theme";
-import { go } from "@/shared/navigation/navigation";
-import { ResultStrip } from "@/shared/ui/ResultStrip";
+import { Pressable, ScrollView, View } from "react-native";
+import type { Page, PlayerMatch } from "@/shared/api/client";
+import { usePlayerApi } from "@/features/players/api/queries";
+import {
+  AccountPicker,
+  useViewedAccount,
+} from "@/features/players/components/AccountPicker";
+import { ProfileHeader } from "@/features/players/components/ProfileHeader";
+import { RecentForm } from "@/features/players/components/RecentForm";
 import { Performance } from "@/features/players/components/Performance";
 import { PlayerHeroList } from "@/features/players/components/PlayerHeroList";
 import { MatchRow } from "@/features/matches/components/MatchRow";
 import { HomePro } from "@/features/pro-scene/components/HomePro";
-import { Notice } from "@/shared/ui/Notice";
+import { getHero } from "@/features/heroes/data/heroes";
 import { useAppState } from "@/shared/state/AppState";
-import { ME } from "@/features/players/data/players";
-import { isWin } from "@/features/matches/data/matches";
-import { rankIcon } from "@/shared/utils/assets";
-import { fmtPct } from "@/shared/utils/format";
-
+import { ApiState } from "@/shared/ui/ApiState";
+import { Art } from "@/shared/ui/Art";
+import { Button } from "@/shared/ui/Button";
+import { Icon } from "@/shared/ui/Icon";
+import { Notice } from "@/shared/ui/Notice";
+import { Section } from "@/shared/ui/Section";
+import { Txt } from "@/shared/ui/Txt";
+import { go } from "@/shared/navigation/navigation";
+import { C, s } from "@/shared/theme/theme";
 export function Home() {
-  const d = getDashboardData();
-  const { state } = useAppState();
+  const id = useViewedAccount(),
+    { state } = useAppState();
+  const recent = usePlayerApi<Page<PlayerMatch>>(`/players/${id}/matches`, {
+    limit: 3,
+  });
   return (
     <View style={{ gap: 12 }}>
-      <View style={s.between}>
-        <View>
-          <Txt muted>Good evening,</Txt>
-          <Txt bold size={24}>
-            Kaito
-          </Txt>
-        </View>
-        <Badge />
-      </View>
+      <Txt muted>Good evening,</Txt>
+      <AccountPicker />
       <Pressable
         onPress={() => go("search")}
         style={[s.input, s.row, { flex: undefined }]}
@@ -45,105 +39,35 @@ export function Home() {
         <Icon name="search" size={18} />
         <Txt muted>Search players, heroes, teams or match IDs</Txt>
       </Pressable>
-      <Card>
-        <View style={s.row}>
-          <Art hero="storm_spirit" />
-          <View style={{ flex: 1 }}>
-            <Txt bold size={16}>
-              Kaito <Text style={{ color: C.gold, fontSize: 10 }}>PLUS</Text>
-            </Txt>
-            <Txt muted>Ancient III · ~4,180 MMR est.</Txt>
-          </View>
-          <Image
-            source={{ uri: rankIcon(63) }}
-            style={{ width: 52, height: 52 }}
-          />
-        </View>
-        <View style={s.row}>
-          <Ring value={d.w20 / 20} />
-          <View style={{ flex: 1, gap: 14 }}>
-            <View style={s.between}>
-              <View>
-                <Txt muted size={9}>
-                  RECORD
-                </Txt>
-                <Txt color={C.win} bold>
-                  {d.w20}W <Text style={{ color: C.loss }}>{20 - d.w20}L</Text>
-                </Txt>
-              </View>
-              <View>
-                <Txt muted size={9}>
-                  AVG KDA
-                </Txt>
-                <Txt bold>{d.avgKda.toFixed(2)}</Txt>
-              </View>
-            </View>
-            <View style={s.between}>
-              <View>
-                <Txt muted size={9}>
-                  AVG GPM
-                </Txt>
-                <Txt color={C.gold} bold>
-                  {Math.round(d.avgGpm)}
-                </Txt>
-              </View>
-              <View>
-                <Txt muted size={9}>
-                  ALL TIME
-                </Txt>
-                <Txt bold color={C.win}>
-                  {fmtPct(ME.wins / (ME.wins + ME.losses))}
-                </Txt>
-              </View>
-            </View>
-          </View>
-        </View>
-        <ResultStrip results={[...d.last20].reverse().map(isWin)} />
-        <Button onPress={() => go("profile")}>View profile</Button>
-      </Card>
+      <ProfileHeader id={id} />
+      <RecentForm id={id} />
+      <Button onPress={() => go("profile")}>View profile</Button>
       <View style={s.wrap}>
         {[
-          ["Match History", "48 recent games", "matches", "matches"],
-          ["Hero Stats", "127 heroes", "heroes", "heroes"],
-          ["Builds", "Storm Spirit", "build", "build"],
-          ["Pro Scene", "Teams & results", "pro", "pro"],
-        ].map(([label, sub, icon, route]) => (
+          ["Match History", "matches", "matches"],
+          ["Hero Stats", "heroes", "heroes"],
+          ["Builds", "build", "build"],
+          ["Pro Scene", "pro", "pro"],
+        ].map(([label, icon, route]) => (
           <Pressable
-            key={label}
+            key={route}
             onPress={() => go(route, route === "build" ? { heroId: 17 } : {})}
-            style={[s.card, s.row, { width: "48.5%", padding: 12 }]}
+            style={[s.card, s.row, { width: "48%", padding: 12 }]}
           >
-            <Icon
-              name={icon}
-              color={
-                icon === "matches"
-                  ? C.red
-                  : icon === "heroes"
-                    ? "#38bdf8"
-                    : C.gold
-              }
-            />
-            <View style={{ flex: 1 }}>
-              <Txt bold size={12}>
-                {label}
-              </Txt>
-              <Txt muted size={10}>
-                {sub}
-              </Txt>
-            </View>
+            <Icon name={icon} color={C.gold} />
+            <Txt bold>{label}</Txt>
           </Pressable>
         ))}
       </View>
       <Section
         title="Performance overview"
-        eyebrow="Last 20 matches"
+        eyebrow="Up to 20 latest matches"
         action="Stats"
         onPress={() => go("profile")}
       />
-      <Performance />
+      <Performance id={id} />
       <Section
         title="Live matches"
-        eyebrow="Availability"
         action="See all"
         onPress={() => go("live")}
       />
@@ -163,7 +87,7 @@ export function Home() {
             onPress={() => go(route)}
             style={[
               s.card,
-              { width: "31.5%", alignItems: "center", paddingVertical: 20 },
+              { width: "31%", alignItems: "center", paddingVertical: 20 },
             ]}
           >
             <Icon name={icon} color={C.gold} />
@@ -174,11 +98,19 @@ export function Home() {
         ))}
       </View>
       <Section
-        title="Recent highlights"
+        title="Recent matches"
         action="See all"
         onPress={() => go("matches")}
       />
-      {d.highlights.map((m) => (
+      <ApiState
+        pending={recent.isPending}
+        error={recent.error}
+        retry={() => void recent.refetch()}
+      />
+      {recent.data && !recent.error && !recent.data.data.items.length && (
+        <Txt muted>No recent matches.</Txt>
+      )}
+      {recent.data?.data.items.map((m) => (
         <MatchRow key={m.match_id} m={m} />
       ))}
       <Section title="Latest professional match" />
@@ -189,24 +121,16 @@ export function Home() {
         onPress={() => go("favorites")}
       />
       <ScrollView horizontal contentContainerStyle={{ gap: 8 }}>
-        {state.heroes.map((id) => (
+        {state.heroes.map((hero) => (
           <Pressable
-            key={id}
-            onPress={() => go("hero", { id })}
-            style={{
-              backgroundColor: C.card,
-              borderRadius: 14,
-              overflow: "hidden",
-              width: 105,
-            }}
+            key={hero}
+            onPress={() => go("hero", { id: hero })}
+            style={[s.card, { width: 105, padding: 0, overflow: "hidden" }]}
           >
-            <Art hero={getHero(id).key} width={105} height={65} />
-            <View style={{ padding: 8 }}>
-              <Txt bold size={11}>
-                {getHero(id).name}
-              </Txt>
-              <Txt size={10}>{fmtPct(heroStats(id).winRate)} WR</Txt>
-            </View>
+            <Art hero={getHero(hero).key} width={105} height={65} />
+            <Txt bold size={11}>
+              {getHero(hero).name}
+            </Txt>
           </Pressable>
         ))}
       </ScrollView>
@@ -215,42 +139,22 @@ export function Home() {
         action="See all"
         onPress={() => go("profile")}
       />
-      <PlayerHeroList limit={5} />
+      <PlayerHeroList id={id} limit={5} />
       <Section
-        title="Meta movers"
-        eyebrow="Last 14 days"
-        action="Hero meta"
+        title="Hero meta"
+        action="See all"
         onPress={() => go("heroRanks")}
       />
-      <View style={s.wrap}>
-        {d.movers.map(({ h, delta, tr }) => (
-          <Pressable
-            key={h.id}
-            onPress={() => go("hero", { id: h.id })}
-            style={[s.card, { width: "48.5%" }]}
-          >
-            <View style={s.row}>
-              <Art hero={h.key} width={28} height={28} />
-              <Txt bold size={11}>
-                {h.name}
-              </Txt>
-            </View>
-            <Txt color={delta > 0 ? C.win : C.loss}>
-              {delta > 0 ? "+" : ""}
-              {(delta * 100).toFixed(1)}pp
-            </Txt>
-            <Spark values={tr} height={48} color={delta > 0 ? C.win : C.loss} />
-          </Pressable>
-        ))}
-      </View>
+      <Notice>
+        Historical meta changes are unavailable. Open Hero meta for current
+        statistics.
+      </Notice>
       <Section title="Tournaments" action="See all" onPress={() => go("pro")} />
       <HomePro kind="leagues" />
-      <View style={{ padding: 20 }}>
-        <Txt muted size={10}>
-          Deterministic sample data based on the original design. Artwork loads
-          from public CDNs.
-        </Txt>
-      </View>
+      <Txt muted size={10}>
+        Player and match data from the backend API. Missing statistics are shown
+        as —.
+      </Txt>
     </View>
   );
 }

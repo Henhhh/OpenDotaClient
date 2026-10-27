@@ -106,9 +106,9 @@ export function MatchCardApi({ match: m }: { match: MatchSummary }) {
             ? "Radiant victory"
             : "Dire victory"}
       </Txt>
-      <Txt muted>
-        Detailed match statistics are currently unavailable.
-      </Txt>
+      <Button onPress={() => go("match", { id: m.match_id })}>
+        View match details
+      </Button>
     </Card>
   );
 }

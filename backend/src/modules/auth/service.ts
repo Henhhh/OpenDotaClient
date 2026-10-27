@@ -1,199 +1,160 @@
-import { createHash, randomBytes } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type {
-  LoginStart,
-  Session,
-  PlayerSummary,
-} from "../../../../shared/api-contract.ts";
-import { ApiError } from "../part2/http.ts";
+import type { Session } from "../../../../shared/api-contract.ts";
+import { ApiError } from "../../core/http.ts";
 import { transaction } from "../../database/index.ts";
 import { createMeStore } from "../me/store.ts";
 import type { createSessionStore } from "../../database/session-store.ts";
-import { authorizationUrl, createSteamVerifier, opaqueToken } from "./steam.ts";
-const hash = (s: string) => createHash("sha256").update(s).digest("hex");
-const random = () => randomBytes(32).toString("base64url");
-const denied = () =>
-  new ApiError(401, "UNAUTHORIZED", "Login expired or invalid");
-export const summary = (account_id: string): PlayerSummary => ({
-  account_id,
-  name: null,
-  avatar_url: null,
-  country: null,
-  rank_tier: null,
-  leaderboard_rank: null,
-});
+import { hashPassword, verifyPassword } from "./password.ts";
 export interface AuthConfig {
-  publicBaseUrl: string;
-  webOrigins: readonly string[];
-  webRedirects: readonly string[];
-  nativeRedirects: readonly string[];
   production: boolean;
+  webOrigins: readonly string[];
 }
 export function createAuthService(
   db: DatabaseSync,
   sessions: ReturnType<typeof createSessionStore>,
-  config: AuthConfig,
-  verify = createSteamVerifier(),
+  _config: AuthConfig,
   now = Date.now,
 ) {
-  const base = new URL(config.publicBaseUrl);
-  if (
-    !["http:", "https:"].includes(base.protocol) ||
-    base.username ||
-    base.password ||
-    base.pathname !== "/" ||
-    base.search ||
-    base.hash ||
-    (config.production && base.protocol !== "https:")
-  )
-    throw new Error("Invalid PUBLIC_BASE_URL");
-  for (const redirect of [...config.webRedirects, ...config.nativeRedirects]) {
-    const url = new URL(redirect);
-    if (url.username || url.password || url.hash || url.search)
-      throw new Error(
-        "Redirect URIs must have no credentials, query or fragment",
+  const attempts = new Map<string, { n: number; until: number }>();
+  function throttle(ip: string, email: string) {
+    for (const [k, v] of attempts) if (v.until <= now()) attempts.delete(k);
+    const keys = [
+      "ip:" + ip,
+      "email:" + createHash("sha256").update(email).digest("hex"),
+    ];
+    if (attempts.size > 10000)
+      throw new ApiError(
+        429,
+        "RATE_LIMITED",
+        "Authentication is busy. Retry later.",
+        900,
       );
-    if (
-      config.webRedirects.includes(redirect) &&
-      (!config.webOrigins.includes(url.origin) ||
-        !["http:", "https:"].includes(url.protocol) ||
-        (config.production && url.protocol !== "https:"))
-    )
-      throw new Error("Invalid web redirect");
-    if (
-      config.nativeRedirects.includes(redirect) &&
-      ["http:", "https:", "javascript:", "data:", "file:"].includes(
-        url.protocol,
-      )
-    )
-      throw new Error("Invalid native redirect");
+    for (const key of keys) {
+      const a = attempts.get(key) ?? { n: 0, until: now() + 15 * 60000 };
+      if (a.n >= 15)
+        throw new ApiError(
+          429,
+          "RATE_LIMITED",
+          "Too many sign-in attempts. Retry in 15 minutes.",
+          Math.max(1, Math.ceil((a.until - now()) / 1000)),
+        );
+      a.n++;
+      attempts.set(key, a);
+    }
   }
+  function issue(userId: string, platform: "web" | "native") {
+    const created = sessions.createForUser(userId, platform);
+    const session: Session = {
+      user: sessions.user(userId),
+      expires_at: created.expires_at,
+    };
+    createMeStore(db).notify(
+      userId,
+      "login:" + createHash("sha256").update(created.token).digest("hex"),
+      {
+        kind: "system",
+        title: "Sign-in successful",
+        body: "A new session was created for your account.",
+        target: null,
+      },
+    );
+    return { session, token: created.token, platform };
+  }
+  const conflict = () =>
+    new ApiError(409, "CONFLICT", "Email is already registered.");
   return {
-    start(
-      redirect_uri: string,
+    async register(
+      email: string,
+      password: string,
+      name: string,
       platform: "web" | "native",
-    ): { data: LoginStart; browser_token: string | null } {
-      const allowed =
-        platform === "web" ? config.webRedirects : config.nativeRedirects;
-      if (!allowed.includes(redirect_uri))
-        throw new ApiError(400, "VALIDATION_ERROR", "Redirect not allowed");
-      const state = random(),
-        browser = platform === "web" ? random() : null,
-        expires = now() + 600000;
-      const returnTo = new URL("/api/v1/auth/steam/callback", base);
-      returnTo.searchParams.set("state", state);
-      db.prepare(
-        "INSERT INTO auth_flows(state_hash,redirect_uri,platform,browser_hash,expires_at,return_to) VALUES (?,?,?,?,?,?)",
-      ).run(
-        hash(state),
-        redirect_uri,
-        platform,
-        browser ? hash(browser) : null,
-        expires,
-        returnTo.href,
-      );
-      return {
-        data: {
-          authorization_url: authorizationUrl(returnTo.href, base.origin + "/"),
-          state,
-          expires_at: new Date(expires).toISOString(),
-        },
-        browser_token: browser,
-      };
-    },
-    async callback(state: string, params: Record<string, string>) {
-      if (!opaqueToken.test(state)) throw denied();
-      const flow = db
-        .prepare(
-          "SELECT * FROM auth_flows WHERE state_hash=? AND expires_at>? AND code_hash IS NULL",
-        )
-        .get(hash(state), now());
-      if (!flow) throw denied();
-      const assertion = await verify(params, String(flow.return_to));
+      ip: string,
+    ) {
+      throttle(ip, email);
+      if (db.prepare("SELECT user_id FROM users WHERE email=?").get(email))
+        throw conflict();
+      const hashed = await hashPassword(password);
       return transaction(db, () => {
-        const code = random();
-        db.prepare("DELETE FROM openid_nonces WHERE expires_at<=?").run(now());
-        if (
-          db
-            .prepare("SELECT nonce FROM openid_nonces WHERE nonce=?")
-            .get(assertion.nonce)
-        )
-          throw denied();
+        if (db.prepare("SELECT user_id FROM users WHERE email=?").get(email))
+          throw conflict();
+        const id = randomUUID();
+        db.prepare(
+          "INSERT INTO users(user_id,identity_key,created_at,email,password_hash,display_name) VALUES (?,?,?,?,?,?)",
+        ).run(
+          id,
+          "app:" + id,
+          new Date(now()).toISOString(),
+          email,
+          hashed,
+          name,
+        );
+        db.prepare("INSERT INTO settings(user_id) VALUES (?)").run(id);
+        return issue(id, platform);
+      });
+    },
+    async login(
+      email: string,
+      password: string,
+      platform: "web" | "native",
+      ip: string,
+    ) {
+      throttle(ip, email);
+      const u = db
+        .prepare("SELECT user_id,password_hash FROM users WHERE email=?")
+        .get(email);
+      if (
+        !(await verifyPassword(
+          password,
+          u?.password_hash ? String(u.password_hash) : null,
+        ))
+      )
+        throw new ApiError(
+          401,
+          "UNAUTHORIZED",
+          "Email or password is incorrect.",
+        );
+      return transaction(db, () => issue(String(u!.user_id), platform));
+    },
+    async credentials(
+      userId: string,
+      email: string,
+      password: string,
+      name: string,
+      ip: string,
+    ) {
+      throttle(ip, email);
+      const u = db
+        .prepare("SELECT email FROM users WHERE user_id=?")
+        .get(userId);
+      if (!u || u.email !== null)
+        throw new ApiError(
+          409,
+          "CONFLICT",
+          "This account already has login credentials.",
+        );
+      if (db.prepare("SELECT user_id FROM users WHERE email=?").get(email))
+        throw conflict();
+      const hashed = await hashPassword(password);
+      return transaction(db, () => {
+        if (db.prepare("SELECT user_id FROM users WHERE email=?").get(email))
+          throw conflict();
         const changed = db
           .prepare(
-            "UPDATE auth_flows SET code_hash=?,code_expires_at=?,account_id=? WHERE state_hash=? AND expires_at>? AND code_hash IS NULL",
+            "UPDATE users SET email=?,password_hash=?,display_name=? WHERE user_id=? AND email IS NULL",
           )
-          .run(
-            hash(code),
-            now() + 60000,
-            assertion.account_id,
-            hash(state),
-            now(),
-          );
-        if (!changed.changes) throw denied();
-        db.prepare("INSERT INTO openid_nonces VALUES (?,?)").run(
-          assertion.nonce,
-          now() + 600000,
-        );
-        const redirect = new URL(String(flow.redirect_uri));
-        redirect.searchParams.set("code", code);
-        redirect.searchParams.set("state", state);
-        return redirect.href;
+          .run(email, hashed, name, userId);
+        if (!changed.changes)
+          throw new ApiError(409, "CONFLICT", "Credentials were already set.");
+        return sessions.user(userId);
       });
     },
-    exchange(
-      code: string,
-      state: string,
-      browserToken: string | undefined,
-      origin: string | undefined,
-    ) {
-      if (!opaqueToken.test(code) || !opaqueToken.test(state)) throw denied();
-      return transaction(db, () => {
-        const row = db
-          .prepare(
-            "SELECT * FROM auth_flows WHERE state_hash=? AND code_hash=? AND code_expires_at>? AND expires_at>?",
-          )
-          .get(hash(state), hash(code), now(), now());
-        if (!row || !row.account_id) throw denied();
-        if (
-          row.platform === "web" &&
-          (!browserToken ||
-            !opaqueToken.test(browserToken) ||
-            hash(browserToken) !== row.browser_hash ||
-            !origin ||
-            !config.webOrigins.includes(origin))
-        )
-          throw denied();
-        db.prepare("DELETE FROM auth_flows WHERE state_hash=?").run(
-          hash(state),
-        );
-        const created = sessions.createForVerifiedAccount(
-          String(row.account_id),
-          row.platform as "web" | "native",
-        );
-        const session: Session = {
-          user: summary(created.principal.account_id),
-          expires_at: created.expires_at,
-        };
-        createMeStore(db).notify(
-          created.principal.user_id,
-          `login:${hash(created.token)}`,
-          {
-            kind: "system",
-            title: "Steam sign-in successful",
-            body: "A new session was created for your account.",
-            target: null,
-          },
-        );
-        return { session, token: created.token, platform: created.platform };
-      });
-    },
-    pruneExpired() {
-      return db
-        .prepare(
-          "DELETE FROM auth_flows WHERE expires_at<=? OR code_expires_at<=?",
-        )
-        .run(now(), now()).changes;
+    setDotaAccount(userId: string, id: string | null) {
+      db.prepare("UPDATE users SET dota_account_id=? WHERE user_id=?").run(
+        id,
+        userId,
+      );
+      return sessions.user(userId);
     },
   };
 }

@@ -1,5 +1,9 @@
 # OpenDota Mobile
 
+Auth đã chuyển sang đăng ký/đăng nhập email + mật khẩu trong Settings, dùng được trên
+Expo Go; không mở Steam hay dùng callback. Xem [AUTH.md](../docs/AUTH.md).
+Tài khoản app độc lập với Dota account ID được chọn để xem dữ liệu công khai.
+
 ## Cập nhật tích hợp phần 2
 
 Heroes, Hero detail, HeroRanks, Search và Builds đã dùng backend API phần 2.

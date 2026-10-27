@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View, Switch } from "react-native";
 import { useSession } from "@/features/auth/SessionProvider";
-import { AccountGate } from "@/features/auth/AccountGate";
+import { AccountGate, AuthForm } from "@/features/auth/AccountGate";
 import { useSettings, useAccountMutation } from "@/features/account/api";
 import { apiRequest, type Settings as SettingsDto } from "@/shared/api/client";
 import { ApiState } from "@/shared/ui/ApiState";
@@ -64,7 +64,10 @@ export function Settings() {
       <Section title="Account" />
       <AccountGate>
         <Card>
-          <Txt bold>Steam account {auth.session?.user.account_id}</Txt>
+          <Txt bold>{auth.session?.user.name}</Txt>
+          <Txt muted>
+            {auth.session?.user.email ?? "Email sign-in is not set up yet"}
+          </Txt>
           <Txt muted>
             Session expires{" "}
             {auth.session?.expires_at
@@ -81,6 +84,7 @@ export function Settings() {
           </Button>
         </Card>
       </AccountGate>
+      {auth.session && !auth.session.user.email && <AuthForm upgrade />}
       {auth.session && (
         <>
           <Section title="Preferences" />

@@ -21,7 +21,7 @@ test('migration is repeatable, persists sessions and enables foreign keys', () =
     const store = createSessionStore(db);
     const session = store.createForVerifiedAccount('1','web');
     migrate(db);
-    assert.equal(db.prepare('SELECT count(*) AS n FROM schema_migrations').get()!.n, 2);
+    assert.equal(db.prepare('SELECT count(*) AS n FROM schema_migrations').get()!.n, 3);
     assert.equal(db.prepare('PRAGMA foreign_keys').get()!.foreign_keys, 1);
     assert.deepEqual({ ...db.prepare('SELECT theme,language,in_app_notifications FROM settings').get() }, { theme: 'dark', language: 'en', in_app_notifications: 1 });
     assert.notEqual(db.prepare('SELECT token_hash FROM sessions').get()!.token_hash, session.token);

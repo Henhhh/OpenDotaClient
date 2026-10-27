@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { OpenDotaClient } from '../../../../shared/api-contract.ts';
 import { HeroesService } from './service.ts';
-import { endpoint, query, pagination, text, numericId, compareId, page } from '../part2/http.ts';
+import { endpoint, query, pagination, text, numericId, compareId, page, ApiError } from '../../core/http.ts';
 export { HeroesService } from './service.ts';
 export function createRouter(deps: { client: OpenDotaClient; enableRankings?: boolean }) {
   const router = Router();
@@ -38,7 +38,7 @@ export function createRouter(deps: { client: OpenDotaClient; enableRankings?: bo
   router.get('/:h/rankings', endpoint(async (req, context) => {
     const id = heroId(req.params.h);
     const q = query(req, z.object(pagination).strict());
-    if (!deps.enableRankings) { const { ApiError } = await import('../part2/http.ts'); throw new ApiError(501, 'FEATURE_UNAVAILABLE', 'Hero rankings not enabled'); }
+    if (!deps.enableRankings) { throw new ApiError(501, 'FEATURE_UNAVAILABLE', 'Hero rankings not enabled'); }
     const result = await service.rankings(id, context);
     return { ...result, data: page(result.data, q.limit, q.offset) };
   }));

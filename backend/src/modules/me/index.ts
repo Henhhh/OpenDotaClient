@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { RequestHandler } from "express";
 import { z } from "zod";
-import { endpoint, query, pagination, numericId, page } from "../part2/http.ts";
+import { endpoint, query, pagination, numericId, page } from "../../core/http.ts";
 import { sessionPrincipal } from "../auth/session.ts";
 import type { createMeStore } from "./store.ts";
 const empty = z.object({}).strict();

@@ -1,13 +1,17 @@
 import { test, expect } from "@playwright/test";
-import { mockPart2 } from "./fixtures/part2";
+import { setupPart1 } from "./fixtures/part1.mts";
+let fixture: Awaited<ReturnType<typeof setupPart1>>;
 test.beforeEach(async ({ page }) => {
-  await mockPart2(page);
+  fixture = await setupPart1(page);
   await page.route("**/api/v1/auth/session", (route) =>
     route.fulfill({
       status: 401,
       json: { error: { message: "Session required" } },
     }),
   );
+});
+test.afterEach(async () => {
+  await fixture?.close();
 });
 test.use({ viewport: { width: 393, height: 852 } });
 test("navigation, filters, search and account sign-in gate", async ({
@@ -18,18 +22,18 @@ test("navigation, filters, search and account sign-in gate", async ({
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Good evening,")).toBeVisible();
   await page.getByRole("button", { name: "Refresh data" }).click();
-  await expect(page.getByText(/Sample data refreshed/)).toBeVisible();
+  await expect(page.getByText(/API data refreshed/)).toBeVisible();
   await page.getByRole("tab", { name: "Matches", exact: true }).click();
   await page.getByRole("button", { name: "filter", exact: true }).click();
   await page.getByRole("button", { name: "Wins", exact: true }).click();
-  await page.getByRole("button", { name: "Show 25 matches" }).click();
-  await expect(page.getByText("25 matches shown")).toBeVisible();
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByText("12 matches · 12 loaded")).toBeVisible();
   await page.getByRole("button", { name: "filter", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Wins", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Reset", exact: true }).click();
-  await page.getByRole("button", { name: "Show 48 matches" }).click();
+  await page.getByRole("button", { name: "Apply filters" }).click();
   await page.getByRole("tab", { name: "Heroes", exact: true }).click();
   await page.getByRole("button", { name: "View as list" }).click();
   await page
@@ -55,11 +59,11 @@ test("navigation, filters, search and account sign-in gate", async ({
     .getByRole("button", { name: "Notifications", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Sign in with Steam", exact: true }),
+    page.getByRole("button", { name: "Sign in", exact: true }),
   ).toBeVisible();
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(
-    page.getByRole("button", { name: "Sign in with Steam", exact: true }),
+    page.getByRole("button", { name: "Sign in", exact: true }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -107,8 +111,10 @@ test("profile and pro tabs", async ({ page }) => {
     await page.getByRole("button", { name: label, exact: true }).click();
   }
   await page.getByRole("button", { name: "Statistics", exact: true }).click();
-  await page.getByRole("button", { name: "7 days", exact: true }).click();
-  await expect(page.getByText("Totals", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Recent", exact: true }).click();
+  await expect(
+    page.getByText("20 matches · 20 samples", { exact: true }),
+  ).toBeVisible();
   await page.goto("/pro", { waitUntil: "domcontentloaded" });
   for (const label of ["Teams", "Players", "Tournaments", "Matches"]) {
     await page.getByRole("button", { name: label, exact: true }).click();

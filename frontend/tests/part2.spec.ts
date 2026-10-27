@@ -208,9 +208,7 @@ test("match builds show no fabricated inventory and handle missing abilities", a
     });
   });
   await page.goto("/build?heroId=1&matchId=123&slot=0");
-  await expect(
-    page.getByText(/Inventory and purchase timeline for match 123/),
-  ).toBeVisible();
+  await expect(page.getByText(/Match 123 · slot 0/)).toBeVisible();
   await expect(page.getByText("Final inventory", { exact: true })).toHaveCount(
     0,
   );

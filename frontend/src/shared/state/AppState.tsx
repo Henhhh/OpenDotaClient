@@ -15,6 +15,7 @@ import {
 } from "react";
 
 type State = {
+  account: string;
   heroes: number[];
   players: number[];
   teams: number[];
@@ -24,6 +25,7 @@ type State = {
 };
 
 const initial: State = {
+  account: "311360822",
   heroes: [17, 39, 13],
   players: [311360822, 900111222],
   teams: [7119388],
@@ -51,7 +53,15 @@ export function AppState({ children }: { children: ReactNode }) {
             Object.fromEntries(
               Object.entries(initial).map(([k, v]) => [
                 k,
-                Array.isArray(p[k]) ? p[k] : v,
+                k === "account"
+                  ? typeof p[k] === "string" &&
+                    /^[1-9]\d{0,9}$/.test(p[k]) &&
+                    Number(p[k]) <= 4294967295
+                    ? p[k]
+                    : v
+                  : Array.isArray(p[k])
+                    ? p[k]
+                    : v,
               ]),
             ) as State,
           );
