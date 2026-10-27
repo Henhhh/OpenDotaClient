@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import type { OpenDotaClient, UpstreamGetOptions, TeamSearchService } from '../../shared/api-contract.ts';
 import { createPart2App } from '../src/part2-dev.ts';
 import { contractClient, OpenDotaClient as Transport, UpstreamError } from '../src/integrations/opendota/index.ts';
-import { createTeamCatalogSearch } from '../src/modules/search/team-catalog.ts';
+import { createTeamCatalogSearch } from '../src/modules/pro/team-search.ts';
 
 const time = '2026-10-27T00:00:00Z';
 const hero = (id: number, name: string, attr = 'agi') => ({ id, name: `npc_dota_hero_${name.toLowerCase()}`, localized_name: name, primary_attr: attr, attack_type: 'Melee', roles: ['Carry'], pro_pick: 10, pro_win: 6, pro_ban: 2, '7_pick': 20, '7_win': 11 });

@@ -9,7 +9,7 @@ test("real browser → backend → OpenDota heroes, builds and search", async ({
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/heroes");
+  await page.goto("/main/heroes");
   await expect(page.getByLabel("Anti-Mage", { exact: true })).toBeVisible({
     timeout: 30000,
   });

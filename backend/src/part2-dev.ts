@@ -9,7 +9,7 @@ import { contractClient } from "./integrations/opendota/index.ts";
 import { createRouter as heroes } from "./modules/heroes/index.ts";
 import { createRouter as constants } from "./modules/constants/index.ts";
 import { createRouter as search } from "./modules/search/index.ts";
-import { createTeamCatalogSearch } from "./modules/search/team-catalog.ts";
+import { createTeamCatalogSearch } from "./modules/pro/team-search.ts";
 import { errorHandler, ApiError } from "./core/http.ts";
 import { requestContext, cors } from "./core/middleware.ts";
 export function createPart2App(deps: {

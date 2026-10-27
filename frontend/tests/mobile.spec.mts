@@ -20,6 +20,7 @@ test("navigation, filters, search and account sign-in gate", async ({
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/main$/);
   await expect(page.getByText("Good evening,")).toBeVisible();
   await page.getByRole("button", { name: "Refresh data" }).click();
   await expect(page.getByText(/API data refreshed/)).toBeVisible();
@@ -75,18 +76,18 @@ test("all primary and detail routes render without runtime errors", async ({
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   for (const route of [
-    "/pro",
-    "/profile",
-    "/hero?id=17",
-    "/player?id=148217346",
-    "/live",
-    "/rankings",
-    "/team?id=7119388",
-    "/league?id=17801",
-    "/build?heroId=17",
-    "/favorites",
-    "/compare",
-    "/settings",
+    "/main/pro",
+    "/main/profile",
+    "/heroes/detail?id=17",
+    "/players/detail?id=148217346",
+    "/pro-scene/live",
+    "/pro-scene/rankings",
+    "/pro-scene/team?id=7119388",
+    "/pro-scene/league?id=17801",
+    "/heroes/build?heroId=17",
+    "/account/favorites",
+    "/players/compare",
+    "/account/settings",
   ]) {
     await page.goto(route, { waitUntil: "domcontentloaded" });
     await expect(
@@ -99,7 +100,7 @@ test("all primary and detail routes render without runtime errors", async ({
 test("profile and pro tabs", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/profile", { waitUntil: "domcontentloaded" });
+  await page.goto("/main/profile", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Recent form", { exact: true })).toBeVisible();
   for (const label of [
     "Matches",
@@ -115,7 +116,7 @@ test("profile and pro tabs", async ({ page }) => {
   await expect(
     page.getByText("20 matches · 20 samples", { exact: true }),
   ).toBeVisible();
-  await page.goto("/pro", { waitUntil: "domcontentloaded" });
+  await page.goto("/main/pro", { waitUntil: "domcontentloaded" });
   for (const label of ["Teams", "Players", "Tournaments", "Matches"]) {
     await page.getByRole("button", { name: label, exact: true }).click();
   }
@@ -124,10 +125,10 @@ test("profile and pro tabs", async ({ page }) => {
 test("favorite persistence", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/hero?id=1", { waitUntil: "domcontentloaded" });
+  await page.goto("/heroes/detail?id=1", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Abilities", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "☆ Favorite", exact: true }).click();
-  await page.goto("/favorites", { waitUntil: "domcontentloaded" });
+  await page.goto("/account/favorites", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Anti-Mage", { exact: true })).toBeVisible();
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByText("Anti-Mage", { exact: true })).toBeVisible();
@@ -137,13 +138,19 @@ test("narrow layouts", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.setViewportSize({ width: 360, height: 780 });
-  for (const route of ["/", "/heroes", "/matches", "/profile", "/pro"]) {
+  for (const route of [
+    "/main",
+    "/main/heroes",
+    "/main/matches",
+    "/main/profile",
+    "/main/pro",
+  ]) {
     await page.goto(route, { waitUntil: "domcontentloaded" });
     await expect(
       page.getByRole("tab", { name: "Home", exact: true }),
     ).toBeVisible();
     await page.screenshot({
-      path: `test-results/${route === "/" ? "home" : route.slice(1)}-360.png`,
+      path: `test-results/${route === "/main" ? "home" : route.slice(1)}-360.png`,
     });
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),

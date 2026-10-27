@@ -24,7 +24,6 @@ import {
   opaqueId,
   dateRange,
 } from "../src/core/http.ts";
-import { ApiError as LegacyApiError } from "../src/modules/part2/http.ts";
 import { createHealthRouter } from "../src/core/health.ts";
 import { createApp } from "../src/app.ts";
 
@@ -209,7 +208,6 @@ test("strict query/body parsing and JSON pointer null metadata stay consistent a
   });
 });
 test("unexpected exceptions never expose stack/secrets and 429 always provides integer Retry-After", async () => {
-  assert.equal(ApiError, LegacyApiError);
   const app = setup();
   app.get("/secret", () => {
     throw Error("password=must-not-appear");

@@ -9,7 +9,7 @@ import { openDatabase, migrate } from '../src/database/index.ts';
 import { createSessionStore } from '../src/database/session-store.ts';
 import { createParseJobStore } from '../src/database/parse-job-store.ts';
 import { requireSession, sessionPrincipal, SESSION_COOKIE } from '../src/modules/auth/session.ts';
-import { errorHandler } from '../src/modules/part2/http.ts';
+import { errorHandler } from '../src/core/http.ts';
 import { createTeamCatalogSearch } from '../src/modules/pro/team-search.ts';
 import type { OpenDotaClient } from '../../shared/api-contract.ts';
 import { createPart3Foundation } from '../src/part3-foundation.ts';

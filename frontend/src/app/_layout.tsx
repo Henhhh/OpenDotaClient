@@ -10,6 +10,7 @@ import { Icon } from "@/shared/ui/Icon";
 import { setNavigationOrigin } from "@/shared/navigation/navigation";
 import { useFonts } from "expo-font";
 import { C } from "@/shared/theme/theme";
+import { MAIN_TABS, defaultTabForPath } from "@/shared/navigation/routes";
 
 const Inter_400Regular = require("@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf");
 
@@ -19,26 +20,13 @@ const Inter_800ExtraBold = require("@expo-google-fonts/inter/800ExtraBold/Inter_
 
 const queryClient = new QueryClient();
 
-const tabs = [
-  ["home", "Home", "/"],
-  ["matches", "Matches", "/matches"],
-  ["heroes", "Heroes", "/heroes"],
-  ["pro", "Pro Scene", "/pro"],
-  ["profile", "Profile", "/profile"],
-] as const;
+const tabs = MAIN_TABS;
 
 export default function Layout() {
   const path = usePathname();
   const { origin } = useGlobalSearchParams<{ origin?: string }>();
   const root = tabs.find((t) => t[2] === path);
-  const active =
-    root?.[0] ??
-    origin ??
-    (["/hero", "/heroRanks"].includes(path)
-      ? "heroes"
-      : ["/live", "/rankings", "/team", "/league"].includes(path)
-        ? "pro"
-        : "home");
+  const active = root?.[0] ?? origin ?? defaultTabForPath(path);
   useEffect(() => setNavigationOrigin(active), [active]);
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,

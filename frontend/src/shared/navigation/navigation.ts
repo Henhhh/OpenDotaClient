@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import type { Route } from "@/shared/navigation/types";
+import { routePath } from "./routes";
 
 let navigationOrigin = "home";
 
@@ -8,7 +8,7 @@ export function setNavigationOrigin(origin: string) {
 }
 
 export function go(name: string, params: Record<string, string | number> = {}) {
-  const pathname = name === "home" ? "/" : `/${name}`;
+  const pathname = routePath(name);
   if (["home", "matches", "heroes", "pro", "profile"].includes(name)) {
     router.navigate({ pathname: pathname as never, params });
     return;
@@ -17,14 +17,4 @@ export function go(name: string, params: Record<string, string | number> = {}) {
     pathname: pathname as never,
     params: { origin: navigationOrigin, ...params },
   });
-}
-
-export function openRoute(r: Route) {
-  const { name, ...rest } = r;
-  go(
-    name,
-    Object.fromEntries(
-      Object.entries(rest).filter(([, v]) => v !== undefined),
-    ) as Record<string, string | number>,
-  );
 }

@@ -11,7 +11,7 @@ import { Performance } from "@/features/players/components/Performance";
 import { PlayerHeroList } from "@/features/players/components/PlayerHeroList";
 import { MatchRow } from "@/features/matches/components/MatchRow";
 import { HomePro } from "@/features/pro-scene/components/HomePro";
-import { getHero } from "@/features/heroes/data/heroes";
+import { heroPresentation } from "@/features/heroes/data/presentation";
 import { useAppState } from "@/shared/state/AppState";
 import { ApiState } from "@/shared/ui/ApiState";
 import { Art } from "@/shared/ui/Art";
@@ -127,9 +127,13 @@ export function Home() {
             onPress={() => go("hero", { id: hero })}
             style={[s.card, { width: 105, padding: 0, overflow: "hidden" }]}
           >
-            <Art hero={getHero(hero).key} width={105} height={65} />
+            <Art
+              hero={heroPresentation(String(hero)).key}
+              width={105}
+              height={65}
+            />
             <Txt bold size={11}>
-              {getHero(hero).name}
+              {heroPresentation(String(hero)).name}
             </Txt>
           </Pressable>
         ))}

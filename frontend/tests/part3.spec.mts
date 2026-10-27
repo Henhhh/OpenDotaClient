@@ -91,7 +91,7 @@ test("Pro Scene uses real backend routers: tabs, pagination, team/league details
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   try {
-    await page.goto("/pro", { waitUntil: "domcontentloaded" });
+    await page.goto("/main/pro", { waitUntil: "domcontentloaded" });
     await expect(page.getByText(/Match 123/)).toBeVisible();
     await page.getByRole("button", { name: "Teams", exact: true }).click();
     await expect(page.getByText("API Team 1", { exact: true })).toBeVisible();
@@ -99,24 +99,24 @@ test("Pro Scene uses real backend routers: tabs, pagination, team/league details
     await expect(page.getByText("API Team 21", { exact: true })).toBeVisible();
     await page.getByText("API Team 1", { exact: true }).click();
     await expect(page.getByText("API Player", { exact: true })).toBeVisible();
-    await page.goto("/pro", { waitUntil: "domcontentloaded" });
+    await page.goto("/main/pro", { waitUntil: "domcontentloaded" });
     await page
       .getByRole("button", { name: "Tournaments", exact: true })
       .click();
     await page.getByText("API League", { exact: true }).click();
     await expect(page.getByText("API Team 1", { exact: true })).toBeVisible();
-    await page.goto("/live", { waitUntil: "domcontentloaded" });
+    await page.goto("/pro-scene/live", { waitUntil: "domcontentloaded" });
     await expect(
       page.getByText("This feature is not enabled on the backend yet."),
     ).toBeVisible();
-    await page.goto("/rankings", { waitUntil: "domcontentloaded" });
+    await page.goto("/pro-scene/rankings", { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "Players", exact: true }).click();
     await expect(
       page.getByText(/Regional player MMR leaderboards are not available/),
     ).toBeVisible();
     expect(errors).toEqual([]);
     await page.setViewportSize({ width: 360, height: 780 });
-    await page.goto("/pro", { waitUntil: "domcontentloaded" });
+    await page.goto("/main/pro", { waitUntil: "domcontentloaded" });
     await expect(page.getByText(/Match 123/)).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
@@ -131,7 +131,7 @@ test("Pro Scene uses real backend routers: tabs, pagination, team/league details
 });
 
 async function register(page: Page, email: string, name: string) {
-  await page.goto("/settings");
+  await page.goto("/account/settings");
   await page
     .getByRole("button", { name: "Create an account", exact: true })
     .click();
@@ -156,20 +156,20 @@ test("form registration, cookie persistence, favorites/settings/notifications, l
   page.on("pageerror", (e) => errors.push(e.message));
   try {
     await register(page, "first@example.com", "First User");
-    await page.goto("/team?id=1");
+    await page.goto("/pro-scene/team?id=1");
     await page
       .getByRole("button", { name: "Favorite team", exact: true })
       .click();
     await expect(
       page.getByRole("button", { name: "Remove team favorite", exact: true }),
     ).toBeVisible();
-    await page.goto("/favorites");
+    await page.goto("/account/favorites");
     await page.getByRole("button", { name: "Teams", exact: true }).click();
     await expect(page.getByText("API Team 1", { exact: true })).toBeVisible();
     await page.reload();
     await page.getByRole("button", { name: "Teams", exact: true }).click();
     await expect(page.getByText("API Team 1", { exact: true })).toBeVisible();
-    await page.goto("/notifications");
+    await page.goto("/account/notifications");
     await expect(
       page.getByText("Sign-in successful", { exact: true }),
     ).toBeVisible();
@@ -177,7 +177,7 @@ test("form registration, cookie persistence, favorites/settings/notifications, l
       .getByRole("button", { name: "Mark all read", exact: true })
       .click();
     await expect(page.getByText("0 unread", { exact: true })).toBeVisible();
-    await page.goto("/settings");
+    await page.goto("/account/settings");
     await page
       .getByRole("switch", { name: "Enable in-app notifications" })
       .click();
@@ -214,7 +214,7 @@ test("form registration, cookie persistence, favorites/settings/notifications, l
     ).toBeVisible();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await register(page, "second@example.com", "Second User");
-    await page.goto("/favorites");
+    await page.goto("/account/favorites");
     await page.getByRole("button", { name: "Teams", exact: true }).click();
     await expect(
       page.getByText("No favorites yet.", { exact: true }),
@@ -228,7 +228,7 @@ test("form registration, cookie persistence, favorites/settings/notifications, l
 test("form validation and API errors remain recoverable", async ({ page }) => {
   const fixture = await setup(page);
   try {
-    await page.goto("/settings");
+    await page.goto("/account/settings");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page.getByText("Enter a valid email.")).toBeVisible();
     await page
@@ -254,7 +254,7 @@ test("form validation and API errors remain recoverable", async ({ page }) => {
         json: { error: { message: "OpenDota request failed" } },
       }),
     );
-    await page.goto("/rankings");
+    await page.goto("/pro-scene/rankings");
     await expect(
       page.getByText("OpenDota request failed", { exact: true }),
     ).toBeVisible();
