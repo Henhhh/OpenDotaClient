@@ -2,9 +2,15 @@ import { test, expect } from "@playwright/test";
 import { mockPart2 } from "./fixtures/part2";
 test.beforeEach(async ({ page }) => {
   await mockPart2(page);
+  await page.route("**/api/v1/auth/session", (route) =>
+    route.fulfill({
+      status: 401,
+      json: { error: { message: "Session required" } },
+    }),
+  );
 });
 test.use({ viewport: { width: 393, height: 852 } });
-test("navigation, filters, search and persistent read state", async ({
+test("navigation, filters, search and account sign-in gate", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -45,11 +51,16 @@ test("navigation, filters, search and persistent read state", async ({
   await page.getByRole("button", { name: "Open match 8312547001" }).click();
   await expect(page.getByText("Match details", { exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Home", exact: true }).click();
-  await page.getByRole("button", { name: /unread notifications/ }).click();
-  await page.getByRole("button", { name: "Mark all read" }).click();
-  await expect(page.getByText("0 unread", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Notifications", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Sign in with Steam", exact: true }),
+  ).toBeVisible();
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.getByText("0 unread", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Sign in with Steam", exact: true }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 test("all primary and detail routes render without runtime errors", async ({

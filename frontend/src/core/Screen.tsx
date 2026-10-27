@@ -33,8 +33,7 @@ import { IconButton } from "@/shared/ui/IconButton";
 import { Txt } from "@/shared/ui/Txt";
 import { C, s } from "@/shared/theme/theme";
 import { go } from "@/shared/navigation/navigation";
-import { useAppState } from "@/shared/state/AppState";
-import { NOTIFICATIONS } from "@/features/notifications/data/notifications";
+import { useUnread } from "@/features/account/api";
 
 const TITLES: Record<string, string> = {
   home: "OpenDota",
@@ -66,8 +65,19 @@ export function Screen({ name }: { name: string }) {
     "heroRanks",
     "search",
     "build",
+    "pro",
+    "team",
+    "league",
+    "rankings",
+    "live",
+    "settings",
+    "favorites",
+    "notifications",
   ].includes(name);
-  const liveFetching = useIsFetching({ queryKey: ["part2"] });
+  const part2Fetching = useIsFetching({ queryKey: ["part2"] });
+  const part3Fetching = useIsFetching({ queryKey: ["part3"] });
+  const accountFetching = useIsFetching({ queryKey: ["account"] });
+  const liveFetching = part2Fetching + part3Fetching + accountFetching;
   const [grid, setGrid] = useState(true);
   const params = useLocalSearchParams<{
     id?: string;
@@ -78,23 +88,32 @@ export function Screen({ name }: { name: string }) {
   const id = Number(params.id),
     [filter, setFilter] = useState(false),
     [refreshed, setRefreshed] = useState(false);
-  const { state } = useAppState();
+  const notifications = useUnread();
   const query = useQuery({
     queryKey: ["catalog"],
     queryFn: loadCatalog,
     staleTime: 60_000,
   });
   const refresh = () => {
+    const accountRefresh = Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["part3"] }),
+      queryClient.invalidateQueries({ queryKey: ["account"] }),
+    ]);
     if (liveScreen) {
-      void queryClient
-        .invalidateQueries({ queryKey: ["part2"] })
-        .then(() => setRefreshed(true));
+      void Promise.all([
+        accountRefresh,
+        queryClient.invalidateQueries({ queryKey: ["part2"] }),
+      ]).then(() => setRefreshed(true));
       return;
     }
-    void query.refetch().then(() => setRefreshed(true));
+    void Promise.all([query.refetch(), accountRefresh]).then(() =>
+      setRefreshed(true),
+    );
   };
   const root = ["home", "matches", "heroes", "pro", "profile"].includes(name);
-  const unread = NOTIFICATIONS.filter((n) => !state.read.includes(n.id)).length;
+  const unread = notifications.error
+    ? null
+    : (notifications.data?.data.total ?? null);
   let content;
   switch (name) {
     case "home":
@@ -149,10 +168,10 @@ export function Screen({ name }: { name: string }) {
       content = <Rankings />;
       break;
     case "team":
-      content = <TeamDetail id={id} />;
+      content = <TeamDetail id={params.id ?? ""} />;
       break;
     case "league":
-      content = <LeagueDetail id={id} />;
+      content = <LeagueDetail id={params.id ?? ""} />;
       break;
     case "search":
       content = <Search />;
@@ -234,9 +253,13 @@ export function Screen({ name }: { name: string }) {
               <IconButton
                 name="bell"
                 onPress={() => go("notifications")}
-                label={`${unread} unread notifications`}
+                label={
+                  unread == null
+                    ? "Notifications"
+                    : `${unread} unread notifications`
+                }
               />
-              {unread > 0 && (
+              {unread != null && unread > 0 && (
                 <View
                   pointerEvents="none"
                   style={{

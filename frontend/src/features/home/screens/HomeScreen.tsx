@@ -16,10 +16,8 @@ import { ResultStrip } from "@/shared/ui/ResultStrip";
 import { Performance } from "@/features/players/components/Performance";
 import { PlayerHeroList } from "@/features/players/components/PlayerHeroList";
 import { MatchRow } from "@/features/matches/components/MatchRow";
-import { LeagueCard } from "@/features/pro-scene/components/LeagueCard";
-import { LiveCard } from "@/features/pro-scene/components/LiveCard";
-import { ProMatchCard } from "@/features/pro-scene/components/ProMatchCard";
-import { LIVE_MATCHES } from "@/features/pro-scene/data/pro";
+import { HomePro } from "@/features/pro-scene/components/HomePro";
+import { Notice } from "@/shared/ui/Notice";
 import { useAppState } from "@/shared/state/AppState";
 import { ME } from "@/features/players/data/players";
 import { isWin } from "@/features/matches/data/matches";
@@ -108,7 +106,7 @@ export function Home() {
           ["Match History", "48 recent games", "matches", "matches"],
           ["Hero Stats", "127 heroes", "heroes", "heroes"],
           ["Builds", "Storm Spirit", "build", "build"],
-          ["Pro Scene", "3 live now", "pro", "pro"],
+          ["Pro Scene", "Teams & results", "pro", "pro"],
         ].map(([label, sub, icon, route]) => (
           <Pressable
             key={label}
@@ -145,21 +143,11 @@ export function Home() {
       <Performance />
       <Section
         title="Live matches"
-        eyebrow="Mock preview"
+        eyebrow="Availability"
         action="See all"
         onPress={() => go("live")}
       />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 10 }}
-      >
-        {LIVE_MATCHES.map((m) => (
-          <View key={m.id} style={{ width: 300 }}>
-            <LiveCard m={m} compact />
-          </View>
-        ))}
-      </ScrollView>
+      <Notice>Live matches are not available yet.</Notice>
       <Section title="Quick access" eyebrow="More tools" />
       <View style={s.wrap}>
         {[
@@ -193,10 +181,10 @@ export function Home() {
       {d.highlights.map((m) => (
         <MatchRow key={m.match_id} m={m} />
       ))}
-      <Section title="Featured match" eyebrow="Grand final" />
-      <ProMatchCard m={d.featured} />
+      <Section title="Latest professional match" />
+      <HomePro kind="matches" />
       <Section
-        title="Favorite heroes"
+        title="Favorite heroes on this device"
         action="Manage"
         onPress={() => go("favorites")}
       />
@@ -256,9 +244,7 @@ export function Home() {
         ))}
       </View>
       <Section title="Tournaments" action="See all" onPress={() => go("pro")} />
-      {d.events.map((l) => (
-        <LeagueCard key={l.leagueid} league={l} />
-      ))}
+      <HomePro kind="leagues" />
       <View style={{ padding: 20 }}>
         <Txt muted size={10}>
           Deterministic sample data based on the original design. Artwork loads

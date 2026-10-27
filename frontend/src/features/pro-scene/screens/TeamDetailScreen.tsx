@@ -1,61 +1,73 @@
 import { View } from "react-native";
-import {
-  PRO_MATCHES,
-  getTeam,
-  teamRecentResults,
-} from "@/features/pro-scene/data/pro";
-import { PRO_PLAYERS } from "@/features/players/data/players";
-import { C, s } from "@/shared/theme/theme";
-import { Button } from "@/shared/ui/Button";
-import { Card } from "@/shared/ui/Card";
-import { IconButton } from "@/shared/ui/IconButton";
-import { Section } from "@/shared/ui/Section";
+import type { Team, ProPlayer, MatchSummary } from "@/shared/api/client";
+import { ApiState, numberText } from "@/shared/ui/ApiState";
 import { Txt } from "@/shared/ui/Txt";
-import { ResultStrip } from "@/shared/ui/ResultStrip";
-import { go } from "@/shared/navigation/navigation";
+import { Section } from "@/shared/ui/Section";
+import { Button } from "@/shared/ui/Button";
+import { Notice } from "@/shared/ui/Notice";
 import { useFavorite } from "@/shared/state/AppState";
-import { TeamMark } from "@/features/pro-scene/components/TeamMark";
-import { ProMatchCard } from "@/features/pro-scene/components/ProMatchCard";
-
-export function TeamDetail({ id }: { id: number }) {
-  const t = getTeam(id);
-  const [fav, toggle] = useFavorite("teams", id);
+import { usePro, useProList } from "../api/queries";
+import {
+  TeamCard,
+  PlayerCardApi,
+  MatchCardApi,
+  PagedState,
+} from "../components/ApiCards";
+export function TeamDetail({ id }: { id: string }) {
+  const valid = /^[1-9][0-9]{0,19}$/.test(id),
+    team = usePro<Team>(`/pro/teams/${id}`, valid);
+  const roster = useProList<ProPlayer>(
+      `/pro/teams/${id}/players`,
+      {},
+      valid && !!team.data,
+    ),
+    matches = useProList<MatchSummary>(
+      `/pro/teams/${id}/matches`,
+      {},
+      valid && !!team.data,
+    );
+  const [fav, toggle, status] = useFavorite("teams", id);
+  if (!valid) return <Notice>Invalid team ID.</Notice>;
+  if (!team.data)
+    return (
+      <ApiState
+        pending={team.isPending}
+        error={team.error}
+        retry={() => void team.refetch()}
+      />
+    );
   return (
     <View style={{ gap: 12 }}>
-      <Card>
-        <View style={s.row}>
-          <TeamMark team={t} />
-          <View style={{ flex: 1 }}>
-            <Txt bold size={22}>
-              {t.name}
-            </Txt>
-            <Txt muted>
-              {t.region} · Rating {t.rating}
-            </Txt>
-          </View>
-          <IconButton
-            name="star"
-            color={fav ? C.gold : C.muted}
-            onPress={toggle}
-          />
-        </View>
-        <ResultStrip results={teamRecentResults(id)} />
-      </Card>
-      <Section title="Active roster" />
-      {PRO_PLAYERS.filter((p) => p.pro?.teamId === id).map((p) => (
-        <Button
-          key={p.account_id}
-          onPress={() => go("player", { id: p.account_id })}
-        >
-          {p.name} · {p.pro?.role}
-        </Button>
-      ))}
+      <TeamCard team={team.data.data} />
+      <Txt muted>Rating {numberText(team.data.data.rating)}</Txt>
+      <Button onPress={toggle}>
+        {status.pending
+          ? "Saving…"
+          : fav
+            ? "Remove team favorite"
+            : "Favorite team"}
+      </Button>
+      {status.error && <Notice>{status.error.message}</Notice>}
+      <Section title="Players who played for this team" />
+      {roster.data?.pages
+        .flatMap((p) => p.data.items)
+        .map((p) => (
+          <PlayerCardApi key={p.account_id} player={p} />
+        ))}
+      <PagedState
+        query={roster}
+        empty={!roster.data?.pages[0].data.items.length}
+      />
       <Section title="Recent matches" />
-      {PRO_MATCHES.filter(
-        (m) => m.radiant_team_id === id || m.dire_team_id === id,
-      ).map((m) => (
-        <ProMatchCard key={m.match_id} m={m} />
-      ))}
+      {matches.data?.pages
+        .flatMap((p) => p.data.items)
+        .map((m) => (
+          <MatchCardApi key={m.match_id} match={m} />
+        ))}
+      <PagedState
+        query={matches}
+        empty={!matches.data?.pages[0].data.items.length}
+      />
     </View>
   );
 }

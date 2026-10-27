@@ -9,12 +9,21 @@ import { Button } from "@/shared/ui/Button";
 import { Empty } from "@/shared/ui/Empty";
 import { go } from "@/shared/navigation/navigation";
 import { useAppState } from "@/shared/state/AppState";
+import { useSession } from "@/features/auth/SessionProvider";
+import { useFavorites } from "@/features/account/api";
 export function Heroes({ grid = true }: { grid?: boolean }) {
   const [q, setQ] = useState(""),
     [attr, setAttr] = useState("All"),
     [role, setRole] = useState("All roles"),
     [fav, setFav] = useState(false);
   const { state } = useAppState();
+  const { session } = useSession(),
+    accountFavorites = useFavorites();
+  const favoriteIds = session
+    ? (accountFavorites.data
+        ?.filter((f) => f.kind === "hero")
+        .map((f) => f.entity_id) ?? [])
+    : state.heroes.map(String);
   const attrs: Record<string, string> = {
     STR: "str",
     AGI: "agi",
@@ -29,7 +38,7 @@ export function Heroes({ grid = true }: { grid?: boolean }) {
   const rows =
     query.data?.pages
       .flatMap((p) => p.data.items)
-      .filter((h) => !fav || state.heroes.includes(Number(h.hero_id))) ?? [];
+      .filter((h) => !fav || favoriteIds.includes(h.hero_id)) ?? [];
   return (
     <View style={{ gap: 12 }}>
       <TextInput
@@ -73,15 +82,29 @@ export function Heroes({ grid = true }: { grid?: boolean }) {
         error={query.error}
         retry={() => void query.refetch()}
       />
-      {!query.isPending && !query.error && !rows.length && (
-        <Empty
-          text={
-            fav && query.hasNextPage
-              ? "No favorites loaded yet. Load more to continue."
-              : "No heroes found"
-          }
+      {fav && session && (
+        <ApiState
+          pending={accountFavorites.isPending}
+          error={accountFavorites.error}
+          retry={() => void accountFavorites.refetch()}
         />
       )}
+      {!query.isPending &&
+        !query.error &&
+        !(
+          fav &&
+          session &&
+          (accountFavorites.isPending || accountFavorites.error)
+        ) &&
+        !rows.length && (
+          <Empty
+            text={
+              fav && query.hasNextPage
+                ? "No favorites loaded yet. Load more to continue."
+                : "No heroes found"
+            }
+          />
+        )}
       <View style={grid ? s.wrap : { gap: 8 }}>
         {rows.map((h) => (
           <Pressable

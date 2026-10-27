@@ -6,6 +6,11 @@
     "node": ">=24"
   },
   "scripts": {
+    "check:steam": "node --env-file-if-exists=.env scripts/check-steam.ts",
+    "dev": "node --env-file-if-exists=.env src/server.ts",
+    "smoke:part3": "node --env-file-if-exists=.env scripts/smoke-part3.ts",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
+    "test:part3": "node --test tests/part3-*.test.ts",
     "dev:part2": "node --env-file-if-exists=.env src/part2-dev.ts",
     "smoke:part2": "node --env-file-if-exists=.env scripts/smoke-part2.ts",
     "typecheck": "tsc --noEmit",
